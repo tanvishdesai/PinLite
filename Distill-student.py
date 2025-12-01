@@ -1,4 +1,3 @@
-%%writefile Distill_PinPoint.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -47,7 +46,7 @@ class ConfigLite(TeacherConfig):
 
     # --- Knowledge Distillation Parameters ---
     KD_ALPHA = 0.5       # Balances hard vs. soft labels. 0.5 gives them equal weight.
-    KD_BETA = 0.3        # Weight for the attention distillation loss.
+    KD_BETA = 5.0        # Weight for the attention distillation loss. Increased to prioritize EPS.
     KD_TEMPERATURE = 2.0 # Softens probabilities to provide more information.
 
 # =================================================================================

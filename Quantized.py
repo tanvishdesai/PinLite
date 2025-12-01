@@ -249,25 +249,18 @@ def main_quantization(model_path, output_path="quantized_pinpoint.pth"):
     
     # Load small subset for calibration
     config.BATCH_SIZE = 4 
-    # Ensure you have the preprocessed data available
     try:
         train_dataset = LAVDFDataset(config, split='train')
         if len(train_dataset) > 100:
-            # Create a small subset to speed up QAT
             indices = list(range(100))
             train_dataset = torch.utils.data.Subset(train_dataset, indices)
-            
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=4, shuffle=True, collate_fn=collate_fn)
     except Exception as e:
-        print(f"Warning: Could not load dataset ({e}). QAT requires data.")
-        print("Using dummy data for demonstration (Model accuracy will degrade without real data).")
-        # Minimal dummy data fallback just to prove script runs
-        train_loader = [] 
+        print(f"Warning: Could not load dataset ({e}).")
+        raise RuntimeError("QAT Calibration failed due to missing data.")
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
     criterion = nn.BCEWithLogitsLoss()
-
-    # Already in training mode from prepare_qat
     steps = 50 
     
     if len(train_loader) > 0:
