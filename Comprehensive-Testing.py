@@ -6,6 +6,14 @@ import numpy as np
 import os
 import sys
 import importlib.util
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+import numpy as np
+import os
+import sys
+import importlib.util
 import time
 import pandas as pd
 from sklearn.metrics import classification_report, accuracy_score, precision_score, recall_score, f1_score
@@ -15,12 +23,50 @@ from scipy.stats import spearmanr
 import json
 import glob
 import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.metrics import roc_auc_score
 try:
     from thop import profile
 except ImportError:
+    print("Warning: 'thop' library not found. FLOPs calculation will be skipped.")
     profile = None
-    print("Warning: 'thop' library not found. FLOPs calculation will be skipped. Install with `pip install thop`.")
+
+# =================================================================================
+# 1. CONFIGURATION
+# =================================================================================
+
+# Define the source directories
+# For Kaggle, these might be:
+# MODULE_SOURCE_DIR = "/kaggle/input/my-code-dataset/"
+# MODEL_SOURCE_DIR = "/kaggle/input/my-model-dataset/"
+MODULE_SOURCE_DIR = "/kaggle/input/pinlite-all-models-v2-011225" 
+MODEL_SOURCE_DIR = "/kaggle/input/pinlite-all-models-v2-011225"
+
+# !!! IMPORTANT: UPDATE THESE PATHS TO YOUR ACTUAL MODEL FILES !!!
+MODEL_PATHS = {
+    "Base": os.path.join(MODEL_SOURCE_DIR, "best_pinpoint_model_antisocial.pth"),
+    "Distilled": os.path.join(MODEL_SOURCE_DIR, "best_pinpoint_LITE_model.pth"),
+    "Pruned": os.path.join(MODEL_SOURCE_DIR, "best_pinpoint_PRUNED_model.pth"),
+    "Quantized": os.path.join(MODEL_SOURCE_DIR, "best_pinpoint_QUANTIZED_model.pth")
+}
+
+# Data directories (reused from your existing config)
+# Update these if your data is located elsewhere
+TEST_DATA_DIRECTORIES = [
+    "/kaggle/input/la-df-testrin-1",
+    "/kaggle/input/lav-df-testing-part-2",
+    "/kaggle/input/lav-df-testing-part-3",
+    "/kaggle/input/lavdf-testing-part-4"
+]
+ORIGINAL_METADATA_PATH = "/kaggle/input/localized-audio-visual-deepfake-dataset-lav-df/LAV-DF/metadata.json"
+
+# Evaluation Settings
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+BATCH_SIZE = 8
+EPS_SAMPLES = 200  # Number of samples for Explainability Preservation Score
+DEBUG_MODE = False # Set to True to run on a tiny subset for verification
+
+# =================================================================================
+# 2. DYNAMIC MODULE LOADING
 # =================================================================================
 
 def import_module_from_path(module_name, file_path):
@@ -40,7 +86,7 @@ def import_module_from_path(module_name, file_path):
 print("--- Loading Modules ---")
 # Add module source dir to sys.path to ensure internal imports work
 if MODULE_SOURCE_DIR not in sys.path:
-    sys.sys.path.append(os.path.abspath(MODULE_SOURCE_DIR))
+    sys.path.append(os.path.abspath(MODULE_SOURCE_DIR))
 
 try:
     # 1. Load PinPoint-main.py as 'PinPoint'
@@ -200,87 +246,59 @@ def measure_inference_time(model, dataloader, device, num_batches=10):
             
     return np.mean(latencies) if latencies else 0.0
 
-def calculate_flops(model, device, config):
+def measure_flops(model, config, device):
     """Calculates FLOPs and Parameters using thop."""
     if profile is None:
         return 0.0, 0.0
     
-    # Create dummy inputs based on config
-    # Video: [1, T, C, H, W]
+    model.eval()
+    # Create dummy inputs
     video_input = torch.randn(1, config.NUM_FRAMES, 3, config.VIDEO_SIZE[0], config.VIDEO_SIZE[1]).to(device)
-    # Audio: [1, AudioLen, MFCC]
-    audio_input = torch.randn(1, 400, config.NUM_MFCC).to(device)
-    # Mask: [1, T]
+    # Audio input shape depends on the model config, assuming standard here
+    audio_input = torch.randn(1, 400, config.NUM_MFCC).to(device) 
+    # Mask
     video_mask = torch.ones(1, config.NUM_FRAMES).to(device)
-    
+
     try:
-        model.eval()
         # thop.profile expects inputs as a tuple
-        # We need to handle the fact that model forward takes 3 args
-        # But thop might struggle with keyword args or masks. 
-        # Let's try passing them positionally.
         flops, params = profile(model, inputs=(video_input, audio_input, video_mask), verbose=False)
         return flops / 1e9, params / 1e6 # GFLOPs, MParams
     except Exception as e:
-        print(f"  Warning: FLOPs calculation failed: {e}")
+        print(f"  Error calculating FLOPs: {e}")
         return 0.0, 0.0
 
-def plot_pareto_curves(results, output_dir="."):
-    """Generates Pareto curves for Accuracy vs Latency and EPS vs Latency."""
-    if not results: return
-
-    df = pd.DataFrame(results)
-    sns.set_style("whitegrid")
+def plot_pareto_curves(results_df):
+    """Generates and saves Pareto curves."""
+    print("Generating Pareto Curves...")
     
     # 1. Accuracy vs Latency
     plt.figure(figsize=(10, 6))
-    sns.scatterplot(data=df, x="Inference (ms/sample)", y="Accuracy", hue="Model", s=200, style="Model")
+    for i, row in results_df.iterrows():
+        plt.scatter(row['Inference (ms/sample)'], row['Accuracy'], label=row['Model'], s=100)
+        plt.text(row['Inference (ms/sample)'], row['Accuracy'], f"  {row['Model']}", fontsize=9)
     
-    # Add labels
-    for i in range(df.shape[0]):
-        plt.text(
-            df["Inference (ms/sample)"][i]+0.2, 
-            df["Accuracy"][i], 
-            df["Model"][i], 
-            horizontalalignment='left', 
-            size='medium', 
-            color='black', 
-            weight='semibold'
-        )
-        
-    plt.title("Pareto Frontier: Accuracy vs. Latency", fontsize=16)
-    plt.xlabel("Inference Latency (ms/sample) [Lower is Better]", fontsize=12)
-    plt.ylabel("Accuracy [Higher is Better]", fontsize=12)
-    plt.grid(True, which="both", ls="--", c='0.7')
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "pareto_accuracy_latency.png"))
-    plt.close()
-    print("Saved 'pareto_accuracy_latency.png'")
-
+    plt.xlabel('Inference Latency (ms)')
+    plt.ylabel('Accuracy')
+    plt.title('Pareto Frontier: Accuracy vs. Latency')
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend()
+    plt.savefig('Pareto_Accuracy_vs_Latency.png')
+    print("  Saved 'Pareto_Accuracy_vs_Latency.png'")
+    
     # 2. EPS vs Latency
-    if "EPS" in df.columns and df["EPS"].sum() > 0:
+    if 'EPS' in results_df.columns and results_df['EPS'].sum() > 0:
         plt.figure(figsize=(10, 6))
-        sns.scatterplot(data=df, x="Inference (ms/sample)", y="EPS", hue="Model", s=200, style="Model")
+        for i, row in results_df.iterrows():
+            plt.scatter(row['Inference (ms/sample)'], row['EPS'], label=row['Model'], s=100)
+            plt.text(row['Inference (ms/sample)'], row['EPS'], f"  {row['Model']}", fontsize=9)
         
-        for i in range(df.shape[0]):
-            plt.text(
-                df["Inference (ms/sample)"][i]+0.2, 
-                df["EPS"][i], 
-                df["Model"][i], 
-                horizontalalignment='left', 
-                size='medium', 
-                color='black', 
-                weight='semibold'
-            )
-            
-        plt.title("Pareto Frontier: Explainability (EPS) vs. Latency", fontsize=16)
-        plt.xlabel("Inference Latency (ms/sample) [Lower is Better]", fontsize=12)
-        plt.ylabel("EPS Score [Higher is Better]", fontsize=12)
-        plt.grid(True, which="both", ls="--", c='0.7')
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, "pareto_eps_latency.png"))
-        plt.close()
-        print("Saved 'pareto_eps_latency.png'")
+        plt.xlabel('Inference Latency (ms)')
+        plt.ylabel('Explainability Preservation Score (EPS)')
+        plt.title('Pareto Frontier: EPS vs. Latency')
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.legend()
+        plt.savefig('Pareto_EPS_vs_Latency.png')
+        print("  Saved 'Pareto_EPS_vs_Latency.png'")
 
 def calculate_eps(teacher_model, student_model, dataloader, device, model_name, num_samples=200):
     """
@@ -518,11 +536,17 @@ def evaluate_model(model, dataloader, device, model_name):
     rec = recall_score(all_labels, all_preds, zero_division=0)
     f1 = f1_score(all_labels, all_preds, zero_division=0)
     
+    try:
+        auc = roc_auc_score(all_labels, all_preds)
+    except ValueError:
+        auc = 0.0
+
     return {
         "Accuracy": acc,
         "Precision": prec,
         "Recall": rec,
-        "F1-Score": f1
+        "F1-Score": f1,
+        "AUC": auc
     }
 
 # =================================================================================
@@ -567,23 +591,7 @@ if __name__ == "__main__":
         print("CRITICAL: Base model not found. EPS calculation will be disabled for all models.")
     
     # 2. Evaluate Each Model
-    
-    # Filter models based on EXECUTION_MODE
-    models_to_run = {}
-    if EXECUTION_MODE == "ALL":
-        models_to_run = MODEL_PATHS
-    elif EXECUTION_MODE == "ALL_EXCEPT_QUANTIZED":
-        models_to_run = {k: v for k, v in MODEL_PATHS.items() if k != "Quantized"}
-    elif EXECUTION_MODE == "QUANTIZED_ONLY":
-        models_to_run = {k: v for k, v in MODEL_PATHS.items() if k == "Quantized"}
-    else:
-        print(f"Unknown EXECUTION_MODE: {EXECUTION_MODE}. Defaulting to ALL.")
-        models_to_run = MODEL_PATHS
-
-    print(f"Running in mode: {EXECUTION_MODE}")
-    print(f"Models to evaluate: {list(models_to_run.keys())}")
-
-    for name, path in models_to_run.items():
+    for name, path in MODEL_PATHS.items():
         print(f"\n\n>>> Processing Model: {name} <<<")
         
         # Load
@@ -619,13 +627,6 @@ if __name__ == "__main__":
         print("Measuring Inference Time...")
         inf_time = measure_inference_time(model, test_loader, current_device)
         
-        # FLOPs
-        print("Calculating FLOPs...")
-        # Use config from the model if available, else generic
-        model_config = getattr(model, 'config', config)
-        flops, params_thop = calculate_flops(model, current_device, model_config)
-
-        
         # EPS Score
         eps = 0.0
         if teacher_model is not None:
@@ -637,17 +638,41 @@ if __name__ == "__main__":
         else:
             print("Skipping EPS (No Teacher Model).")
         
+        # FLOPs
+        flops = 0.0
+        if current_device != 'cpu': # thop often needs CUDA for correct profiling if model is on CUDA
+             # We need a config object to know input shapes. 
+             # We can try to infer it or use the one from PinPoint/Distill
+             if name == "Base":
+                 temp_config = PinPoint.Config()
+             else:
+                 temp_config = Distill_PinPoint.ConfigLite()
+             flops, _ = measure_flops(model, temp_config, current_device)
+
+        # Peak Memory
+        peak_mem_mb = 0.0
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
+            # Run a dummy pass to trigger memory usage
+            try:
+                _ = measure_inference_time(model, test_loader, current_device, num_batches=1)
+                peak_mem_mb = torch.cuda.max_memory_allocated() / (1024 * 1024)
+            except:
+                pass
+
         # Compile Results
         row = {
             "Model": name,
             "Size (MB)": round(file_size_mb, 2),
             "Params (M)": round(sum(p.numel() for p in model.parameters()) / 1e6, 2),
-            "GFLOPs": round(flops, 2),
+            "FLOPs (G)": round(flops, 2),
             "Inference (ms/sample)": round(inf_time, 2),
+            "Peak VRAM (MB)": round(peak_mem_mb, 2),
             "Accuracy": round(metrics["Accuracy"], 4),
             "Precision": round(metrics["Precision"], 4),
             "Recall": round(metrics["Recall"], 4),
             "F1-Score": round(metrics["F1-Score"], 4),
+            "AUC": round(metrics["AUC"], 4),
             "EPS": round(eps, 4)
         }
         results.append(row)
@@ -679,10 +704,8 @@ if __name__ == "__main__":
         df.to_csv("comprehensive_benchmark_results.csv", index=False)
         print("\nResults saved to 'comprehensive_benchmark_results.csv'")
         
-        # Plot Pareto Curves
-        print("\nGenerating Pareto Plots...")
-        plot_pareto_curves(results)
-
+        # Generate Pareto Plots
+        plot_pareto_curves(df)
     else:
         print("No results generated.")
         
