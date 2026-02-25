@@ -1,238 +1,89 @@
 # PIN-Lite: Efficient and Explainable Multimodal Deepfake Detection via Knowledge Distillation
 
-> **Conference Paper Skeleton** — Sections, tables, figures, and content prompts
+## Abstract
+Briefly summarize the problem (deepfakes, computational cost of detection), the solution (PIN-Lite: Model Compression with Explainability Preservation), and the key results.
+*   **Key Achievement**: Reduced model size by ~8.5x (57MB -> 6.6MB) and improved inference speed by ~2.2x (82.5ms -> 37.6ms) while *maintaining* or even slightly improving accuracy.
+*   **Novelty**: Introduction of the Explainability Preservation Score (EPS) to ensure the compressed model remains trustworthy.
 
----
+## 1. Introduction
+*   **Context**: The proliferation of deepfakes and the need for robust, multimodal detection.
+*   **Problem**: Current SOTA models (like PinPoint) are computationally expensive and hard to deploy on edge devices.
+*   **Gap**: Most compression techniques focus only on accuracy/class probabilities, ignoring the "reasoning" (explainability) of the model.
+*   **Proposed Solution**: PIN-Lite. A pipeline involving Knowledge Distillation (KD) and Structured Pruning.
+*   **Contributions**:
+    1.  Lightweight architecture (PIN-Lite) achieved through KD and Pruning.
+    2.  Proposal of **EPS (Explainability Preservation Score)** to quantify feature alignment between teacher and student.
+    3.  A study on the trade-offs between quantization, pruning, and distillation.
 
-## Abstract (~150-200 words)
-**Content:**
-- **Problem**: Deepfake detection models are large and computationally expensive, limiting edge deployment.
-- **Approach**: Knowledge distillation + structured pruning to compress a multimodal audio-visual transformer.
-- **Key Novelty**: Explainability Preservation Score (EPS) — ensuring compressed models retain attention-based explanations.
-- **Results**: 8.6× smaller, 2.2× faster, 97.5% accuracy, EPS=0.60.
-- **Conclusion**: Practical deepfake detection for resource-constrained environments.
+## 2. Related Work
+*   Multimodal Deepfake Detection (cite PinPoint, etc.).
+*   Model Compression (Distillation, Pruning, Quantization).
+*   Explainable AI (XAI) in Deepfake Detection.
 
----
+## 3. Methodology
 
-## 1. Introduction (~1-1.5 pages)
+### 3.1 The Teacher Model: PinPoint
+*   Brief description of the original model (ResNet backbone + Transformer + Fusion).
+*   Mention it serves as the ground truth for both labels and attention maps.
 
-### 1.1 Problem Statement
-- Rise of deepfakes and societal threat
-- Need for real-time detection on edge devices (phones, cameras)
-- Current models are too large for deployment
-
-### 1.2 Motivation
-- Existing compression methods focus only on accuracy
-- Explainability is critical for trust in forensics
-- Gap: No work on preserving explainability during compression
-
-### 1.3 Contributions
-> **Bulleted list of 3-4 contributions:**
-1. PIN-Lite: A compressed multimodal deepfake detector via knowledge distillation
-2. Explainability Preservation Score (EPS): A novel metric for XAI fidelity
-3. Comprehensive evaluation on LAV-DF benchmark
-4. Analysis of Pareto trade-offs between efficiency and explainability
-
----
-
-## 2. Related Work (~1 page)
-
-### 2.1 Deepfake Detection
-- Face manipulation detection (FaceForensics++, Celeb-DF)
-- Audio-visual approaches (LAVDF, AVoiD-DF)
-- Cite: [Rossler 2019, Li 2020, Cai 2022]
-
-### 2.2 Model Compression
-- Knowledge distillation (Hinton 2015)
-- Structured pruning (Li 2017)
-- Quantization (Jacob 2018)
-- Cite: [Hinton 2015, Howard 2017, Han 2016]
-
-### 2.3 Explainable AI for Deepfakes
-- Attention-based explanations
-- Saliency maps and Integrated Gradients
-- Cite: [Selvaraju 2017, Sundararajan 2017]
-
----
-
-## 3. Method (~2-2.5 pages)
-
-### 3.1 Teacher Model: PinPoint Architecture
-
-> **Figure 1**: PinPoint Architecture Diagram
-> - Video encoder (ResNet-18)
-> - Audio encoder (CNN-GRU)
-> - Gated Cross-Attention layers
-> - Classification head
-
-**Content:**
-- Multimodal fusion via cross-attention
-- Attention maps as explainability proxy
-
-### 3.2 Knowledge Distillation for PIN-Lite
-
-> **Figure 2**: Distillation Pipeline Diagram
-> - Teacher (frozen) → Student (trainable)
-> - Hard loss, Soft loss, Attention loss
-
-**Content:**
-- Student architecture (MobileNetV3 backbone, reduced dimensions)
-- Distillation loss formulation:
-  ```
-  L_total = α·L_hard + (1-α)·L_soft + β·L_attention
-  ```
-
-> **Table 1**: Architecture Comparison (Teacher vs Student)
-| Component | Teacher | Student |
-|-----------|---------|---------|
-| Backbone | ResNet-18 | MobileNetV3-Small |
-| Embed Dim | 256 | 128 |
-| Attention Heads | 8 | 4 |
-| Transformer Layers | 3 | 2 |
-| Parameters | 15M | 1.69M |
+### 3.2 The Student Model: PIN-Lite
+*   **Architecture**: Reduced embedding dimension, fewer heads, lighter backbone (if applicable).
+*   **Knowledge Distillation Strategy**:
+    *   Loss function: $L_{total} = \alpha L_{hard} + (1-\alpha)L_{soft} + \beta L_{attn}$
+    *   **Attention Map Distillation**: Explicitly aligning the attention weights of the student to the teacher.
 
 ### 3.3 Structured Pruning
-- Attention head importance ranking (L1-norm)
-- Iterative prune → fine-tune cycle
-- Making pruning permanent
+*   Method: Iterative pruning of attention heads based on L1-norm importance.
+*   Goal: Remove redundant heads in the Student model to further reduce FLOPs.
 
-### 3.4 Explainability Preservation Score (EPS)
+### 3.4 Direct Quantization (Teacher)
+*   Describe the experiment of directly quantizing the *Original Teacher* model (Post-Training Quantization / QAT).
+*   Goal: To test if the heavy teacher can be compressed effectively without architectural search.
 
-> **Figure 3**: EPS Calculation Diagram
-> - Teacher attention map vs Student attention map
-> - Spearman correlation + IoU visualization
+### 3.5 Explainability Preservation Score (EPS)
+*   **Definition**: A composite metric to evaluate if the student "looks" at the same evidence as the teacher.
+*   **Formula**: $EPS = 0.5 \times \text{SpearmanCorr}(S_T, S_S) + 0.5 \times \text{IoU}(S_T^{top20\%}, S_S^{top20\%})$
+*   **Rationale**: High accuracy without correct reasoning is dangerous (Clever Hans effect).
 
-**Content:**
-- Formal definition:
-  ```
-  EPS = 0.5 × Corr(A_T, A_S) + 0.5 × IoU(Top20%_T, Top20%_S)
-  ```
-- Interpretation: Measures how well compressed model preserves teacher's "focus"
+## 4. Experimental Setup
+*   **Dataset**: LAV-DF (Localized Audio-Visual DeepFake) dataset.
+*   **Baselines**: Original PinPoint (Teacher).
+*   **Metrics**: Accuracy, F1, AUC, EPS, Latency (ms), Model Size (MB), FLOPs (G).
 
----
+## 5. Results and Analysis
 
-## 4. Experimental Setup (~0.5-1 page)
+### 5.1 Comprehensive Performance Comparison
+This section compares the Teacher, Distilled, Pruned, and Quantized models.
 
-### 4.1 Dataset
-- LAV-DF (Localized Audio-Visual DeepFake)
-- Train/Val/Test split statistics
-- Real vs Fake distribution
+**[Table 1 Needed]: Comparative Results of Model Variants**
+*   *Source Data*: `comprehensive_benchmark_results_v2.csv`
+*   *Columns*: Model, Acc(%), F1, AUC, Params(M), Size(MB), Latency(ms), EPS.
+*   *Key Finding*: The **Distilled** model achieves the best trade-off. The **Quantized Teacher** suffers significant accuracy drop (52%) and high latency (likely due to CPU-bound INT8 execution or lack of optimization), proving that simple quantization of the complex Teacher is insufficient.
 
-### 4.2 Implementation Details
-- Framework: PyTorch
-- Hardware: NVIDIA GPU (specify)
-- Training hyperparameters (epochs, LR, batch size)
-- Distillation hyperparameters (α, β, temperature)
+| Model | Accuracy | F1-Score | AUC | Latency (ms) | Size (MB) | EPS |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Teacher (Base)** | 97.37% | 0.9821 | 0.9683 | 82.50 | 57.32 | 1.0 (Ref) |
+| **Distilled** | **97.53%** | **0.9834** | 0.9584 | **37.60** | **6.62** | 0.60 |
+| **Pruned** | 97.38% | 0.9824 | 0.9558 | 39.41 | 6.62 | 0.58 |
+| **Quantized (Teacher)** | 52.13% | 0.5273 | 0.6621 | 424.34 | 25.25 | N/A |
 
-### 4.3 Evaluation Metrics
-- Classification: Accuracy, Precision, Recall, F1, AUC
-- Efficiency: Parameters, FLOPs, Latency, Model Size
-- Explainability: EPS (our metric)
+### 5.2 Efficiency vs. Accuracy (Pareto Analysis)
+**[Figure 1 Needed]: Pareto Frontier (Accuracy vs. Latency)**
+*   *Description*: A scatter plot showing Accuracy on Y-axis and Latency on X-axis.
+*   *Visual*: The Distilled/Pruned models should be in the top-left corner (High Acc, Low Latency).
+*   *File to use*: `Pareto_Accuracy_vs_Latency_v2.png`
 
----
+### 5.3 Explainability Preservation
+**[Figure 2 Needed]: Pareto Frontier (EPS vs. Latency)**
+*   *Description*: Plotting EPS against Latency.
+*   *Analysis*: While Distilled/Pruned models lose some explainability fidelity (EPS ~0.6) compared to the teacher (EPS=1.0), they maintain respectable alignment while being 2x faster.
+*   *File to use*: `Pareto_EPS_vs_Latency_v2.png`
 
-## 5. Results (~1.5-2 pages)
+## 6. Discussion
+*   **Effectiveness of Distillation**: Reducing the model size by ~8x while increasing accuracy (+0.16%) suggests the Teacher was over-parameterized.
+*   **Failure of Direct Quantization**: The Quantized Teacher model failed to maintain performance. This justifies the need for the Distillation approach (PIN-Lite) rather than just quantizing the legacy model.
+*   **The Value of EPS**: It provides a secondary check. Even though Pruned and Distilled have similar accuracy, Distilled has slightly higher EPS (0.60 vs 0.58), suggesting it preserves the teacher's reasoning better.
 
-### 5.1 Main Results
-
-> **Table 2**: Comprehensive Benchmark Results
-| Model | Size | Params | FLOPs | Latency | Accuracy | F1 | EPS |
-|-------|------|--------|-------|---------|----------|-----|-----|
-| Base (Teacher) | 57.32 MB | 15M | 18.71G | 82.5 ms | 97.37% | 98.21% | 1.00 |
-| Distilled | 6.62 MB | 1.69M | 0.78G | 37.6 ms | 97.53% | 98.34% | 0.60 |
-| Pruned | 6.62 MB | 1.69M | 0.78G | 39.4 ms | 97.38% | 98.24% | 0.58 |
-
-**Key Findings:**
-- 8.6× model size reduction (57→6.6 MB)
-- 2.2× faster inference (82→37 ms)
-- Accuracy maintained (97.37%→97.53%)
-- 60% explainability preservation (EPS=0.60)
-
-### 5.2 Pareto Analysis
-
-> **Figure 4**: Pareto Frontier — Accuracy vs Latency
-> - All models plotted, showing distilled in optimal region
-
-> **Figure 5**: Pareto Frontier — EPS vs Latency
-> - Trade-off between explainability and speed
-
-**Content:**
-- Distilled model achieves best Pareto efficiency
-- Acceptable EPS trade-off for significant speed gains
-
-### 5.3 Qualitative Analysis
-
-> **Figure 6**: Attention Map Comparison (2×3 grid)
-> - Row 1: Real video (Teacher vs Student attention)
-> - Row 2: Fake video (Teacher vs Student attention)
-
-**Content:**
-- Visual confirmation of attention similarity
-- Student focuses on same facial/audio regions as teacher
-
-### 5.4 Ablation Study (Optional)
-
-> **Table 3**: Effect of Distillation Hyperparameters
-| α | β | Accuracy | EPS |
-|---|---|----------|-----|
-| 0.3 | 0.3 | 97.1% | 0.55 |
-| 0.5 | 0.3 | 97.5% | 0.60 |
-| 0.7 | 0.3 | 96.8% | 0.48 |
-
----
-
-## 6. Discussion (~0.5 page)
-
-### 6.1 Quantization Failure
-- Quantized model collapsed to 52% accuracy
-- Hypothesis: GRU and attention layers not INT8-friendly
-- Future work: Mixed-precision or attention-specific quantization
-
-### 6.2 EPS Interpretation
-- 60% preservation is acceptable but not perfect
-- Trade-off: Perfect fidelity would require larger student
-
-### 6.3 Limitations
-- Single dataset (LAV-DF) — needs cross-dataset validation
-- No edge hardware benchmarks (Jetson, Raspberry Pi)
-- EPS metric is new — needs community adoption
-
----
-
-## 7. Conclusion (~0.25 page)
-
-**Summary:**
-- Presented PIN-Lite: efficient multimodal deepfake detector
-- Introduced EPS metric for explainability preservation
-- Achieved 8.6× compression with 60% explainability preservation
-- Practical for edge deployment without sacrificing accuracy
-
-**Future Work:**
-- Cross-dataset generalization
-- Edge device deployment (ONNX, TensorRT)
-- Improved quantization strategies
-
----
-
-## References (~20-30 citations)
-Standard conference format (IEEE, ACM, etc.)
-
----
-
-## Supplementary Material (if allowed)
-
-### A. Detailed Architecture Diagrams
-### B. Additional Attention Map Visualizations
-### C. Training Curves
-### D. Statistical Significance Tests
-
----
-
-## Checklist Before Submission
-
-- [ ] All figures generated at 300 DPI
-- [ ] Tables formatted per conference style
-- [ ] References in correct format
-- [ ] Page limit checked
-- [ ] Anonymization (if blind review)
-- [ ] Code/data availability statement
+## 7. Conclusion
+*   Summary of PIN-Lite's success.
+*   Final recommendation for deployment: The **Distilled** model is the best candidate for edge deployment.

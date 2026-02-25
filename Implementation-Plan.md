@@ -91,33 +91,43 @@ Identify Targets: Get the weight modules for each attention head's projection ma
 Prune: Apply a pruning method. For structured pruning of heads, you'll need to create a custom mask that zeros out all weights corresponding to, say, the 3rd head in every layer.
 Fine-tune: Train the pruned model for a few epochs on your training data to recover accuracy.
 Make Pruning Permanent: After fine-tuning, use prune.remove(module, 'weight') to physically remove the zeroed weights and make the model smaller.
-Phase 4: Quantization
-Goal: Convert the model's weights and activations from 32-bit floating point (FP32) to 8-bit integer (INT8), drastically speeding up inference on compatible hardware.
+Phase 4: Quantization (Teacher Model)
+Goal: Convert the *Original Teacher* model's weights and activations from 32-bit floating point (FP32) to 8-bit integer (INT8). This tests whether the powerful teacher model can be made efficient directly, skipping distillation/pruning.
 Parameters to Target: The data type of the weights (FP32 -> INT8).
-Code Modifications (using Quantization-Aware Training - QAT): QAT typically yields better accuracy than post-training quantization.
-Modify Model Definition: Insert "quantization stubs" to tell PyTorch where to start and stop simulating quantization during training.
-# In PinPointLite's __init__
-self.quant = torch.quantization.QuantStub()
-self.dequant = torch.quantization.DeQuantStub()
+Code Modifications (using Quantization-Aware Training - QAT):
+Modify Model Definition: Insert "quantization stubs" into the original `PinpointTransformer` class (or patch it dynamically).
+# In Quantized.py
+# We patch the PinpointTransformer to be QAT-compatible
+def prepare_model_architecture_for_quantization(model):
+    # wrapper to replace BasicBlock with QuantizedBasicBlockWrapper
+    # insert quant/dequant stubs
+    model.quant = QuantStub()
+    model.dequant = DeQuantStub()
+    return model
 
+# Custom forward pass for QAT
+def quantized_forward(self, video, audio, video_mask=None):
+    video_q = self.quant(video)
+    # ... pass through quantized layers ...
+    logits = self.dequant(logits)
+    return logits
 
-# In PinPointLite's forward method
-def forward(self, video, audio, video_mask=None):
-    video = self.quant(video)
-    audio = self.quant(audio)
-    # ... rest of the model forward pass ...
-    classification_logits = self.dequant(classification_logits)
-    offset_logits = self.dequant(offset_logits)
-    return classification_logits, offset_logits, last_attention_map
-Prepare for QAT:
-# After creating the student model
-model.qconfig = torch.quantization.get_default_qat_qconfig('fbgemm')
-model_fused = torch.quantization.fuse_modules(model, [['video_extractor...conv1', 'video_extractor...bn1', 'video_extractor...relu']]) # Example fusion
-model_prepared = torch.quantization.prepare_qat(model_fused.train())
-Train: Train this model_prepared normally for a few epochs. It will simulate the effects of quantization.
-Convert: After training, convert it to a true INT8 model.
-model_prepared.eval()
-model_quantized = torch.quantization.convert(model_prepared)
+Train/Calibrate:
+# Load the TEACHER model (best_pinpoint_model_antisocial.pth)
+model = PinpointTransformer(config)
+model.load_state_dict(torch.load(TEACHER_PATH))
+
+# Fuse modules and Prepare QAT
+model.eval()
+fuse_modules(model, ...)
+model.train()
+torch.quantization.prepare_qat(model, inplace=True)
+
+# Calibrate with a small subset of data
+# Convert to INT8
+model.cpu()
+model_quantized = torch.quantization.convert(model)
+torch.save(model_quantized.state_dict(), "best_pinpoint_QUANTIZED_model.pth")
 Phase 5: Deployment and Benchmarking
 Goal: Convert the final, optimized model to a deployment-friendly format and measure its performance on real edge hardware.
 Execution:
@@ -129,13 +139,17 @@ Deploy and Measure: Write simple inference scripts for your target hardware (e.g
 This is your key contribution. Here’s how to formalize and implement it:
 Definition: The EPS measures the structural similarity and rank correlation between the saliency maps of the teacher model ($S_T$) and the student model ($S_S$) for the same input.
 EPS = w1 * Correlation(S_T, S_S) + w2 * IoU(S_T, S_S)
+
+> [!NOTE]
+> In the current implementation, any EPS calculation for the **Quantized Model** is skipped. EPS is calculated only for the Distilled and Pruned models to compare them against the Teacher.
+
 Code Implementation:
 Create an evaluation script. Loop through your fixed set of 100-200 test samples.
-For each sample, generate the saliency map using Integrated Gradients for both the teacher and the final PIN-Lite student. You'll get two maps, map_teacher and map_student.
-Calculate Correlation: Flatten both maps and compute their Spearman's rank correlation. This checks if both models agree on the relative importance of different pixels/features.
+For each sample, generate the saliency map using Integrated Gradients (or raw Attention Maps) for the Teacher, Distilled, and Pruned models.
+Calculate Correlation: Flatten both maps and compute their Spearman's rank correlation.
 from scipy.stats import spearmanr
 corr, _ = spearmanr(map_teacher.flatten(), map_student.flatten())
-Calculate Intersection over Union (IoU): Binarize the maps by keeping only the top 20% most important pixels. Then calculate the IoU of these two binary masks. This checks if both models agree on which specific regions are most important.
+Calculate Intersection over Union (IoU): Binarize the maps by keeping only the top 20% most important pixels. Then calculate the IoU of these two binary masks.
 Average: Average these scores across all your test samples to get the final EPS for your compressed model.
-You will create a Pareto curve plotting Accuracy vs. Latency and another one plotting EPS vs. Latency. Your goal is to show that PIN-Lite is far to the top-left (better and faster) than other models, and that its EPS remains high even at low latencies.
+You will create a Pareto curve plotting Accuracy vs. Latency and another one plotting EPS vs. Latency. Your goal is to show that PIN-Lite is far to the top-left (better and faster) than other models.
 
