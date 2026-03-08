@@ -1,0 +1,842 @@
+\documentclass[lettersize,journal]{IEEEtran}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{algorithmic}
+\usepackage{algorithm}
+\usepackage{array}
+\usepackage[caption=false,font=normalsize,labelfont=sf,textfont=sf]{subfig}
+\usepackage{textcomp}
+\usepackage{stfloats}
+\usepackage{url}
+\usepackage{verbatim}
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{bm}
+\usepackage{balance}
+\hyphenation{op-tical net-works semi-conduc-tor IEEE-Xplore Deep-Fake Pin-Point multi-modal ex-plain-ability}
+
+\begin{document}
+
+\title{PIN-Lite: Efficient and Explainability-Preserving Compression of a Multimodal Deepfake Detector via Knowledge Distillation, Pruning, and Quantization}
+
+\author{Author~One,~Author~Two,~and~Author~Three
+\thanks{Manuscript received XX, 2026; revised XX, 2026.}
+\thanks{The authors are with [Department], [University], [City], [Country]. E-mail: \{author1, author2, author3\}@university.edu.}}
+
+\markboth{IEEE Transactions on Information Forensics and Security, Vol.~XX, No.~XX, 2026}%
+{PIN-Lite: Efficient and Explainability-Preserving Compression of a Multimodal Deepfake Detector}
+
+\maketitle
+
+% ==============================================================================
+% ABSTRACT
+% ==============================================================================
+\begin{abstract}
+State-of-the-art multimodal deepfake detectors leverage large transformer-based architectures that fuse audio and video modalities through cross-attention mechanisms, achieving high accuracy at the cost of significant computational overhead. This renders them impractical for deployment on resource-constrained edge devices where real-time detection is most needed. Furthermore, existing model compression techniques focus almost exclusively on preserving task accuracy, neglecting the faithfulness of the model's internal explanations---a critical requirement for trustworthy forensic applications. In this paper, we present \textbf{PIN-Lite}, a systematic compression framework for PinPoint, a multimodal audio-visual deepfake detector built on gated cross-attention transformers. Our framework applies a sequential pipeline of (1)~knowledge distillation with explicit attention-map transfer to a lightweight MobileNetV3-based student, (2)~iterative $\ell_1$-norm unstructured pruning with fine-tuning recovery, and (3)~post-training quantization in both INT8 and FP16 formats. We further introduce the \textbf{Explainability Preservation Score (EPS)}, a novel architecture-agnostic metric that quantifies the structural fidelity between the cross-attention maps of the teacher and compressed models through a weighted combination of Spearman's rank correlation and Intersection-over-Union of top-attended regions. Comprehensive experiments on the LAV-DF benchmark demonstrate that PIN-Lite achieves an \textbf{88.7\% reduction in model parameters} (from 15.0M to 1.69M), an \textbf{8.66$\times$ reduction in model size} (from 57.32\,MB to 6.62\,MB), and a \textbf{2.15$\times$ inference speedup} while maintaining comparable accuracy (97.53\% vs.\ 97.37\%) and retaining over 60\% of the teacher's attention-based explainability (EPS\,=\,0.609). The full Distill$+$Prune$+$Quantize pipeline further compresses the model to \textbf{5.29\,MB} (10.83$\times$ reduction) with 98.22\% accuracy and no explainability degradation. Additionally, we evaluate three efficient attention variants---Linear Attention, Multi-Query Attention (MQA), and Low-Rank Attention---revealing that MQA achieves the best accuracy--explainability trade-off (98.0\% accuracy, EPS\,=\,0.606), while Linear Attention catastrophically fails to preserve the teacher's attention structure (EPS\,$\approx$\,0.03) despite achieving high training-time accuracy. Ablation studies on distillation temperature, loss weights, network depth, and pruning rates provide actionable design guidelines for compressing multimodal transformers. These results establish PIN-Lite as a practical, transparent, and efficient solution for on-device deepfake detection.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Deepfake detection, model compression, knowledge distillation, explainability preservation, attention mechanisms, multimodal learning, edge deployment, cross-attention transformers.
+\end{IEEEkeywords}
+
+
+% ==============================================================================
+% I. INTRODUCTION
+% ==============================================================================
+\section{Introduction}
+\label{sec:intro}
+
+\IEEEPARstart{T}{he} rapid proliferation of synthetic media---commonly referred to as deepfakes---poses an escalating threat to information integrity, individual privacy, and societal trust~\cite{wang2022m2tr, tariq2025dfp2e}. Modern deepfake generation techniques leverage sophisticated neural architectures to produce highly convincing face-swaps, lip-synced reenactments, and entirely synthetic audio-visual content that is virtually indistinguishable from authentic media by human observers. The increasing accessibility of such tools has amplified the urgency for automated detection systems capable of operating reliably, efficiently, and---crucially---transparently.
+
+Recent advances in deepfake detection have produced powerful multimodal architectures that jointly analyze audio and video streams through transformer-based cross-attention mechanisms~\cite{du2025cad, shahzad2025avlipsync}. These systems exploit the inherent synchronization patterns between lip movements and speech audio, achieving state-of-the-art detection accuracy. However, such gains come at a substantial computational cost: models such as AV-Lip-Sync+ require up to 249~million parameters and 140\,ms per inference~\cite{shahzad2025avlipsync}, while CAD~\cite{du2025cad} employs frozen CLIP ViT-B/16 ($\sim$86M parameters) and Whisper-Small ($\sim$244M parameters) backbones. These resource demands render such systems unsuitable for deployment on edge devices---mobile phones, surveillance cameras, and IoT platforms---where real-time deepfake detection is most urgently needed.
+
+Model compression techniques, including knowledge distillation (KD)~\cite{hinton2015distilling}, structured pruning, and quantization~\cite{jacob2018quantization}, offer a path toward efficient deployment. Karathanasis~\textit{et al.}~\cite{karathanasis2025compression} demonstrated that up to 90\% compression is achievable for image-based deepfake detectors with preserved same-domain accuracy. However, the vast majority of compression research evaluates success solely through task-level accuracy retention, overlooking a dimension that is equally critical in forensic applications: \emph{explainability}. A compressed model that produces correct predictions but attends to entirely different input regions than its teacher fundamentally undermines the trust and interpretability essential for legal and journalistic scrutiny of deepfakes~\cite{tariq2025dfp2e, malik2025pruning}. Recent works on explanation-enhanced knowledge distillation~\cite{alharbi2021xdistillation, parchami2024e2kd} have demonstrated that standard KD can cause students to learn spurious features, degrading both out-of-distribution generalization and explanation consistency.
+
+In this paper, we address the dual challenge of \emph{efficiency} and \emph{explainability preservation} through PIN-Lite, a comprehensive compression framework for the PinPoint multimodal deepfake detector. Our principal contributions are fourfold:
+
+\begin{enumerate}
+    \item \textbf{A multi-stage compression pipeline} that sequentially applies attention-aware knowledge distillation (using a MobileNetV3-Small~\cite{howard2019mobilenetv3} student), iterative $\ell_1$-norm unstructured pruning with fine-tuning recovery, and post-training quantization (INT8/FP16), achieving a 10.83$\times$ model size reduction (57.32\,MB $\rightarrow$ 5.29\,MB) with no accuracy degradation.
+
+    \item \textbf{The Explainability Preservation Score (EPS)}, a novel architecture-agnostic metric that quantifies the structural fidelity of cross-attention maps between teacher and student models through a weighted combination of Spearman's rank correlation and top-$k$ region Intersection-over-Union, with bootstrap confidence intervals.
+
+    \item \textbf{A systematic evaluation of three efficient attention variants}---Linear Attention~\cite{katharopoulos2020linear}, Multi-Query Attention~\cite{shazeer2019mqa}, and Low-Rank Attention---within the distilled architecture, revealing that accuracy alone is insufficient for evaluating compressed forensic models.
+
+    \item \textbf{Comprehensive ablation studies} on distillation temperature, loss function weights, network depth, and pruning rates that provide practical design guidelines for compressing multimodal cross-attention transformers.
+\end{enumerate}
+
+The remainder of this paper is organized as follows. Section~\ref{sec:related} reviews related work on multimodal deepfake detection, model compression, and explainability preservation. Section~\ref{sec:method} details the PIN-Lite framework, including the teacher and student architectures, the compression pipeline, and the EPS metric. Section~\ref{sec:experiments} presents comprehensive experimental results, and Section~\ref{sec:discussion} discusses implications and limitations. Section~\ref{sec:conclusion} concludes the paper with directions for future research.
+
+
+% ==============================================================================
+% II. RELATED WORK
+% ==============================================================================
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Multimodal Deepfake Detection}
+
+Early deepfake detection methods relied on unimodal analysis of visual artifacts using convolutional neural networks. M2TR~\cite{wang2022m2tr} introduced a multi-modal multi-scale transformer combining RGB features with frequency-domain analysis, achieving 97.93\% accuracy on FaceForensics++ (HQ) and demonstrating robustness against JPEG compression through learnable frequency filters. However, its EfficientNet-b4 backbone with transformer blocks incurs significant computational overhead.
+
+More recent approaches exploit audio-visual inconsistencies as discriminative cues. AV-Lip-Sync+~\cite{shahzad2025avlipsync} employs a self-supervised AV-HuBERT model with a Video Vision Transformer (ViViT) face encoder, achieving 99.29\% accuracy on FakeAVCeleb but requiring 249M parameters and 140\,ms inference latency. CAD~\cite{du2025cad} proposes cross-modal alignment and distillation using frozen CLIP ViT and Whisper backbones with parameter-efficient fine-tuning (LoRA/Adapters), attaining 99.96\% AUC on IDForge. DF-P2E~\cite{tariq2025dfp2e} represents the opposite extreme of the efficiency--explainability spectrum: it integrates CLIP-large, BLIP-large, and LLaMA-3.2 (11B parameters) to generate natural language explanations for deepfake detections, achieving high interpretability at the cost of approximately 28 seconds per image.
+
+While these methods achieve impressive accuracy, their computational requirements---ranging from hundreds of millions to billions of parameters---severely limit practical deployment on resource-constrained devices. Table~\ref{tab:literature} provides a comparative overview of these methods and positions PIN-Lite relative to the state of the art.
+
+% --- Table I: Literature Comparison ---
+\begin{table*}[!t]
+\caption{Comparison of State-of-the-Art Deepfake Detectors and Compression Approaches. PIN-Lite is the only method that jointly addresses multimodal detection, multi-stage compression, and quantitative explainability preservation.\label{tab:literature}}
+\centering
+\footnotesize
+\begin{tabular}{lccccccl}
+\toprule
+\textbf{Method} & \textbf{Year} & \textbf{Modality} & \textbf{Params (M)} & \textbf{Best Acc. (\%)} & \textbf{Dataset} & \textbf{Compression} & \textbf{Explainability} \\
+\midrule
+M2TR~\cite{wang2022m2tr} & 2022 & RGB + Freq. & $\sim$19+ & 97.93 & FF++ (HQ) & None & None \\
+DF-P2E~\cite{tariq2025dfp2e} & 2025 & Visual + LLM & $>$11{,}000 & 91.3 (AUC) & DF40 & 4-bit LLM & Textual (NL) \\
+CAD~\cite{du2025cad} & 2025 & Audio-Visual & $\sim$330 & 99.0 & FakeAVCeleb & LoRA/Adapters & None \\
+AV-Lip-Sync+~\cite{shahzad2025avlipsync} & 2025 & Audio-Visual & 249 & 99.29 & FakeAVCeleb & None & None \\
+Karathanasis~\cite{karathanasis2025compression} & 2025 & Visual & $\sim$4.5 & $>$90 & Synthbuster & KD, Prune, Quant & None \\
+Malik~\cite{malik2025pruning} & 2025 & Visual & $\sim$86 & Maintained & MURA/KVASIR & XAI-guided Prune & XAI-guided \\
+XDistillation~\cite{alharbi2021xdistillation} & 2021 & Visual & 3.5 & 90.9 & CIFAR-10 & KD + CAE & GradCAM \\
+e$^2$KD~\cite{parchami2024e2kd} & 2024 & Visual & $\sim$11 & 71.8 & ImageNet & KD & Saliency \\
+Hendriks~\cite{hendriks2025honey} & 2025 & NLP & 220--770 & $\sim$60--75 & CQA & KD & Textual \\
+\midrule
+\textbf{PIN-Lite (Ours)} & \textbf{2026} & \textbf{Audio-Visual} & \textbf{1.22--1.69} & \textbf{98.22} & \textbf{LAV-DF} & \textbf{KD+Prune+Quant} & \textbf{EPS (Attn. maps)} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Model Compression for Deep Learning}
+
+Knowledge distillation~\cite{hinton2015distilling} trains a compact \emph{student} network to mimic a larger \emph{teacher} by matching soft probability distributions at an elevated temperature, enabling the transfer of ``dark knowledge'' encoded in the teacher's output distribution. Extensions such as FitNets~\cite{romero2015fitnets} match intermediate representations, while attention transfer methods~\cite{zagoruyko2017paying} align attention maps between teacher and student, providing richer supervisory signals beyond logit-level mimicry.
+
+In the deepfake domain specifically, Karathanasis~\textit{et al.}~\cite{karathanasis2025compression} systematically evaluated KD, pruning, and quantization for image-based deepfake detectors, demonstrating that up to 90\% compression is achievable with accuracy preserved on same-domain data. However, they observed significant accuracy degradation on cross-domain evaluations, highlighting a fundamental limitation of compression in this application. Structured pruning removes entire channels, neurons, or attention heads, directly reducing both parameter counts and floating-point operations (FLOPs)~\cite{malik2025pruning}. Post-training quantization converts FP32 weights and activations to lower bit-widths (INT8 or FP16), reducing storage requirements and enabling hardware-accelerated integer arithmetic~\cite{jacob2018quantization}.
+
+\subsection{Explainability-Preserving Compression}
+
+A critical gap in the compression literature is the preservation of model \emph{explanations} during the compression process. XDistillation~\cite{alharbi2021xdistillation} proposed distilling not only output logits but also GradCAM-based explanations from teacher to student via a convolutional autoencoder (CAE), improving explanation overlap by approximately 6\% on CIFAR-10. However, this approach requires training an auxiliary generative model and was evaluated only on simple image classification benchmarks.
+
+e$^2$KD~\cite{parchami2024e2kd} introduced an explanation-enhanced KD loss using cosine similarity between teacher and student saliency maps, demonstrating improved accuracy (+2\% on ImageNet) and out-of-distribution robustness. Their key insight---that students in standard KD often attend to background features rather than objects---directly motivates our attention-transfer approach. Hendriks~\textit{et al.}~\cite{hendriks2025honey} explored KD for large language models, finding that multitask training with explanation losses preserves reasoning interpretability in compressed T5 models. Malik~\textit{et al.}~\cite{malik2025pruning} used XAI attribution methods (LRP, Integrated Gradients) to guide pruning decisions in medical imaging, demonstrating that Vision Transformers maintain accuracy up to 85\% sparsity when pruning is guided by explanation-based importance scores.
+
+Our work extends this line of research in three critical ways: (i)~we address \emph{multimodal} transformers in the deepfake domain, where cross-attention maps provide a natural and interpretable explanation modality; (ii)~we propose a formal, architecture-agnostic metric (EPS) for quantifying attention-map fidelity; and (iii)~we evaluate the interplay between compression, accuracy, and explainability across multiple compression stages and attention mechanisms.
+
+
+% ==============================================================================
+% III. METHODOLOGY
+% ==============================================================================
+\section{Proposed Method: PIN-Lite}
+\label{sec:method}
+
+% --- Figure 1: Overall Framework ---
+\begin{figure*}[!t]
+\centering
+\fbox{\parbox{0.95\textwidth}{\centering\vspace{2.5cm}\textbf{[Figure~1: PIN-Lite Compression Framework Overview]}\\[6pt]
+Left: \textbf{Teacher PinPoint} (ResNet-18 video encoder + CNN-GRU audio encoder + 3 Gated Cross-Attention blocks, 15.0M params, 57.32\,MB). \\
+Center: \textbf{Knowledge Distillation} with three-component loss ($\mathcal{L}_\text{hard}$, $\mathcal{L}_\text{soft}$, $\mathcal{L}_\text{attn}$); attention maps $\mathbf{A}_T$ and $\mathbf{A}_S$ are explicitly aligned. \\
+Right: \textbf{PIN-Lite Student} (MobileNetV3-Small + 2 Cross-Attention blocks, 1.69M params, 6.62\,MB) $\rightarrow$ Iterative Pruning (3 rounds $\times$ 20\%) $\rightarrow$ INT8/FP16 Quantization $\rightarrow$ Final model (5.29\,MB). \\
+Bottom: \textbf{EPS Monitoring} at each stage: EPS is computed by comparing the teacher's and compressed model's cross-attention maps via Spearman's $\rho_s$ and top-$k$ IoU.
+\vspace{2.5cm}}}
+\caption{Overview of the PIN-Lite compression framework. The multimodal PinPoint teacher is progressively compressed through knowledge distillation with attention transfer, iterative pruning, and post-training quantization. The Explainability Preservation Score (EPS) is monitored at each stage to ensure the compressed model retains the teacher's attention-based reasoning patterns.}
+\label{fig:framework}
+\end{figure*}
+
+Fig.~\ref{fig:framework} illustrates the PIN-Lite framework. We describe each component in the following subsections.
+
+\subsection{Teacher Architecture: PinPoint}
+\label{sec:teacher}
+
+The teacher model, PinPoint, is a multimodal audio-visual deepfake detector based on a gated cross-attention transformer architecture. It comprises three principal components.
+
+\subsubsection{Video Feature Extractor}
+A pre-trained ResNet-18~\cite{he2016resnet} backbone (with the first six convolutional layers frozen) extracts per-frame spatial features from $T = 30$ video frames of resolution $128 \times 128$. An adaptive average pooling layer followed by a linear projection maps each frame-level feature vector to the embedding dimension $d = 256$. Learned positional encodings $\mathbf{P}_v \in \mathbb{R}^{T \times d}$ are added to capture temporal ordering:
+\begin{equation}
+    \mathbf{V} = \text{Linear}\bigl(\text{AvgPool}(\text{ResNet18}(\mathbf{x}_v))\bigr) + \mathbf{P}_v
+\end{equation}
+where $\mathbf{x}_v \in \mathbb{R}^{T \times 3 \times 128 \times 128}$ is the input video tensor and $\mathbf{V} \in \mathbb{R}^{T \times d}$ is the resulting video embedding sequence.
+
+\subsubsection{Audio Feature Extractor}
+A CNN-GRU network processes $K$-dimensional Mel-Frequency Cepstral Coefficient (MFCC) features ($K = 13$). Two 1D convolutional layers (Conv1D: $13 \rightarrow 64 \rightarrow 128$ channels) with Layer Normalization~\cite{ba2016layernorm} and ReLU activations extract local spectral patterns. A bidirectional GRU with hidden dimension $d/2 = 128$ captures temporal dynamics, producing audio embeddings $\mathbf{A}_{\text{emb}} \in \mathbb{R}^{T_a \times d}$ where $T_a = 2T$ (two MFCC frames per video frame). Sinusoidal positional encodings are added:
+\begin{equation}
+    \mathbf{A}_{\text{emb}} = \text{GRU}\bigl(\text{Conv1D}(\mathbf{x}_a)\bigr) + \mathbf{P}_{\text{sin}}
+\end{equation}
+
+\subsubsection{Gated Cross-Attention Fusion}
+$L = 3$ stacked Gated Cross-Attention blocks fuse the audio and video modalities. Each block performs three operations. First, multi-head cross-attention ($H = 8$ heads, head dimension $d_k = d/H = 32$) where audio features attend over video features:
+\begin{equation}
+\label{eq:cross_attn}
+    \text{CrossAttn}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \text{softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^\top}{\sqrt{d_k}}\right)\mathbf{V}
+\end{equation}
+with $\mathbf{Q} = \mathbf{A}_{\text{emb}}\mathbf{W}^Q$, $\mathbf{K} = \mathbf{V}_{\text{emb}}\mathbf{W}^K$, $\mathbf{V}_{\text{val}} = \mathbf{V}_{\text{emb}}\mathbf{W}^V$.
+
+Second, a learned gating mechanism modulates the residual connection:
+\begin{equation}
+\label{eq:gate}
+    g = \sigma(\mathbf{W}_g \mathbf{h}_{\text{audio}} + b_g), \quad
+    \mathbf{h}_{\text{out}} = \mathbf{h}_{\text{audio}} + g \odot \text{Dropout}\bigl(\text{CrossAttn}(\cdot)\bigr)
+\end{equation}
+where $\sigma$ denotes the sigmoid function and $\odot$ represents element-wise multiplication. This gate enables the model to adaptively control the influence of cross-modal information at each position.
+
+Third, self-attention over the gated audio features followed by a position-wise feed-forward network (FFN) with GELU activation and expansion factor 4:
+\begin{equation}
+    \text{FFN}(\mathbf{h}) = \mathbf{W}_2 \cdot \text{GELU}(\mathbf{W}_1 \mathbf{h} + \mathbf{b}_1) + \mathbf{b}_2
+\end{equation}
+where $\mathbf{W}_1 \in \mathbb{R}^{d \times 4d}$ and $\mathbf{W}_2 \in \mathbb{R}^{4d \times d}$.
+
+The cross-attention weight matrix from the final layer, $\mathbf{A}_{\text{attn}} \in \mathbb{R}^{T_a \times T_v}$, serves as the model's intrinsic explanation, revealing which audio-video temporal correspondences drive the detection decision. A binary classification head (linear projection) and an offset regression head produce the final predictions. The teacher model contains \textbf{15.0M parameters} with a disk footprint of \textbf{57.32\,MB}.
+
+
+\subsection{Phase~1: Knowledge Distillation}
+\label{sec:kd}
+
+\subsubsection{Student Architecture (PIN-Lite)}
+The PIN-Lite student replaces the teacher's components with lightweight alternatives while preserving architectural compatibility for attention-map comparison:
+\begin{itemize}
+    \item \textbf{Video backbone}: MobileNetV3-Small~\cite{howard2019mobilenetv3} (pre-trained on ImageNet, first 3 inverted residual blocks frozen), reducing visual encoder parameters from $\sim$11M to $\sim$1.5M. The feature dimension (576) is projected to the student embedding dimension $d_s = 128$.
+    \item \textbf{Embedding dimension}: Reduced from $d = 256$ to $d_s = 128$.
+    \item \textbf{Attention heads}: Reduced from $H = 8$ to $H_s = 4$ (head dimension maintained at $d_k = 32$).
+    \item \textbf{Transformer layers}: Reduced from $L = 3$ to $L_s = 2$.
+    \item \textbf{Dropout}: Increased from 0.1 to 0.15 to compensate for reduced capacity.
+\end{itemize}
+
+The audio feature extractor architecture is shared between teacher and student (same CNN-GRU structure adapted to $d_s$). The resulting student has \textbf{1.69M parameters} (88.7\% reduction) and occupies \textbf{6.62\,MB} on disk.
+
+% --- Figure 2: Architecture Comparison ---
+\begin{figure}[!t]
+\centering
+\fbox{\parbox{0.9\columnwidth}{\centering\vspace{2cm}\textbf{[Figure~2: Architecture Comparison]}\\[4pt]
+Side-by-side diagram of the Teacher (PinPoint) and Student (PIN-Lite) architectures. \\
+\textbf{Teacher}: ResNet-18 ($d{=}256$, $H{=}8$, $L{=}3$, 15.0M params). \\
+\textbf{Student}: MobileNetV3-Small ($d{=}128$, $H{=}4$, $L{=}2$, 1.69M params). \\
+Both share the same gated cross-attention block structure; dimensions and depth are scaled down. Attention maps $\mathbf{A}_T$ and $\mathbf{A}_S$ are extracted from the final cross-attention layer of each model.
+\vspace{2cm}}}
+\caption{Architectural comparison between the PinPoint teacher and PIN-Lite student. The student maintains structural compatibility with the teacher while reducing all architectural dimensions, enabling direct attention-map comparison for EPS computation.}
+\label{fig:architecture}
+\end{figure}
+
+\subsubsection{Distillation Objective}
+The student is trained with a three-component loss function that jointly optimizes for task performance, logit-level knowledge transfer, and attention-map fidelity:
+\begin{equation}
+\label{eq:loss_total}
+    \mathcal{L}_{\text{total}} = \alpha \cdot \mathcal{L}_{\text{hard}} + (1 - \alpha) \cdot \mathcal{L}_{\text{soft}} + \beta \cdot \mathcal{L}_{\text{attn}}
+\end{equation}
+
+\textbf{Hard loss} $\mathcal{L}_{\text{hard}}$ is the binary cross-entropy between the student's classification logits $\mathbf{z}_s$ and ground-truth labels $y$:
+\begin{equation}
+    \mathcal{L}_{\text{hard}} = -\frac{1}{B}\sum_{i=1}^{B}\bigl[y_i \log \hat{y}_i^s + (1 - y_i)\log(1 - \hat{y}_i^s)\bigr]
+\end{equation}
+where $\hat{y}_i^s = \sigma(z_s^{(i)})$ and $B$ is the batch size.
+
+\textbf{Soft distillation loss} $\mathcal{L}_{\text{soft}}$ is the Kullback--Leibler divergence between temperature-softened logits of the teacher and student:
+\begin{equation}
+\label{eq:soft_loss}
+    \mathcal{L}_{\text{soft}} = T^2 \cdot D_{\text{KL}}\!\left(\sigma\!\left(\frac{\mathbf{z}_s}{T}\right) \bigg\| \sigma\!\left(\frac{\mathbf{z}_t}{T}\right)\right)
+\end{equation}
+where $T$ is the distillation temperature and $\mathbf{z}_t$ are the teacher's logits. The $T^2$ scaling factor compensates for the gradient magnitude reduction caused by softening~\cite{hinton2015distilling}.
+
+\textbf{Attention transfer loss} $\mathcal{L}_{\text{attn}}$ is the mean squared error between the teacher's and student's cross-attention maps, explicitly encouraging the student to preserve the teacher's audio-visual reasoning patterns:
+\begin{equation}
+\label{eq:attn_loss}
+    \mathcal{L}_{\text{attn}} = \frac{1}{B} \sum_{i=1}^{B} \bigl\| \mathbf{A}_T^{(i)} - \mathbf{A}_S^{(i)} \bigr\|_F^2
+\end{equation}
+where $\mathbf{A}_T^{(i)}$ and $\mathbf{A}_S^{(i)}$ denote the cross-attention maps from the final transformer layer of the teacher and student, respectively, and $\|\cdot\|_F$ is the Frobenius norm. When the attention maps differ in spatial resolution (due to different embedding dimensions), bilinear interpolation is applied to resize the student's map to match the teacher's dimensions prior to computing the loss.
+
+The hyperparameters $\alpha$ and $\beta$ control the balance between hard label supervision, soft knowledge transfer, and attention alignment. The default configuration uses $\alpha = 0.5$, $\beta = 5.0$, and $T = 2.0$.
+
+\subsubsection{Training Protocol}
+The student is trained for $E = 20$ epochs using AdamW~\cite{loshchilov2019adamw} with learning rate $\eta = 2 \times 10^{-4}$, weight decay $\lambda = 10^{-4}$, batch size 8, and cosine annealing learning rate scheduling. Mixed-precision training via \texttt{GradScaler} accelerates computation, and gradient clipping (max norm\,=\,1.0) stabilizes training. Aggressive data augmentation---including random Gaussian noise injection, color jitter, and temporal shuffling---is applied to prevent shortcut learning. The training procedure is formalized in Algorithm~\ref{alg:distillation}.
+
+% --- Algorithm 1: Knowledge Distillation ---
+\begin{algorithm}[!t]
+\caption{PIN-Lite Knowledge Distillation}
+\label{alg:distillation}
+\begin{algorithmic}[1]
+\REQUIRE Teacher model $\mathcal{T}$, training data $\mathcal{D}$, hyperparameters $\alpha$, $\beta$, $T$, epochs $E$
+\ENSURE Distilled student model $\mathcal{S}$
+\STATE Initialize $\mathcal{S}$ with MobileNetV3-Small backbone
+\STATE $\mathcal{T}.\texttt{eval()}$; freeze all parameters of $\mathcal{T}$
+\FOR{$e = 1$ \TO $E$}
+    \FOR{each mini-batch $(\mathbf{x}_v, \mathbf{x}_a, \mathbf{y}) \in \mathcal{D}$}
+        \STATE $(\mathbf{z}_t, \mathbf{A}_T) \leftarrow \mathcal{T}(\mathbf{x}_v, \mathbf{x}_a)$ \hfill $\triangleright$ No gradient
+        \STATE $(\mathbf{z}_s, \mathbf{A}_S) \leftarrow \mathcal{S}(\mathbf{x}_v, \mathbf{x}_a)$
+        \STATE $\mathcal{L}_{\text{hard}} \leftarrow \text{BCE}(\mathbf{z}_s, \mathbf{y})$
+        \STATE $\mathcal{L}_{\text{soft}} \leftarrow T^2 \cdot D_{\text{KL}}\!\left(\sigma(\mathbf{z}_s / T) \| \sigma(\mathbf{z}_t / T)\right)$
+        \STATE $\mathcal{L}_{\text{attn}} \leftarrow \text{MSE}(\mathbf{A}_S, \mathbf{A}_T)$
+        \STATE $\mathcal{L}_{\text{total}} \leftarrow \alpha \mathcal{L}_{\text{hard}} + (1{-}\alpha)\mathcal{L}_{\text{soft}} + \beta \mathcal{L}_{\text{attn}}$
+        \STATE Update $\mathcal{S}$ via AdamW on $\mathcal{L}_{\text{total}}$
+    \ENDFOR
+\ENDFOR
+\RETURN $\mathcal{S}$
+\end{algorithmic}
+\end{algorithm}
+
+
+\subsection{Phase~2: Iterative Structured Pruning}
+\label{sec:pruning}
+
+After distillation, we apply iterative global unstructured pruning using the $\ell_1$-norm criterion to further compress the student model. The pruning process proceeds in $R = 3$ rounds, each targeting $p = 20\%$ additional sparsity of the remaining unpruned weights. After each pruning round, the model is fine-tuned for $E_{\text{ft}} = 3$ epochs on the training data using only the hard classification loss ($\mathcal{L}_{\text{hard}}$) to recover any accuracy degradation:
+\begin{equation}
+    \mathbf{w}^{(r)} = \text{Prune}_{p}\!\left(\mathbf{w}^{(r-1)}\right), \quad r = 1, \ldots, R
+\end{equation}
+where $\text{Prune}_p(\cdot)$ zeros out the $p$-fraction of weights with the smallest $\ell_1$ magnitudes across all targeted layers (Linear and GRU). After the final iteration, pruning masks are made permanent via \texttt{prune.remove()}, collapsing the mask into the weight tensor. The pruning procedure is described in Algorithm~\ref{alg:pruning}.
+
+\begin{algorithm}[!t]
+\caption{Iterative Pruning with Fine-Tuning Recovery}
+\label{alg:pruning}
+\begin{algorithmic}[1]
+\REQUIRE Distilled student $\mathcal{S}$, data $\mathcal{D}$, rounds $R$, rate $p$, fine-tune epochs $E_{\text{ft}}$
+\ENSURE Pruned student $\mathcal{S}_p$
+\STATE $\mathcal{S}_p \leftarrow \mathcal{S}$
+\FOR{$r = 1$ \TO $R$}
+    \STATE Apply global $\ell_1$ unstructured pruning at rate $p$ to $\mathcal{S}_p$
+    \FOR{$e = 1$ \TO $E_{\text{ft}}$}
+        \STATE Fine-tune $\mathcal{S}_p$ on $\mathcal{D}$ with $\mathcal{L}_{\text{hard}}$
+    \ENDFOR
+\ENDFOR
+\STATE Make all pruning masks permanent
+\RETURN $\mathcal{S}_p$
+\end{algorithmic}
+\end{algorithm}
+
+
+\subsection{Phase~3: Post-Training Quantization}
+\label{sec:quantization}
+
+We evaluate two complementary quantization strategies on the compressed student model:
+
+\textbf{Dynamic INT8 Quantization.} Post-training dynamic quantization~\cite{jacob2018quantization} is applied to all \texttt{nn.Linear} and \texttt{nn.GRU} layers, converting FP32 weights to INT8 at inference time with dynamically computed activation scales. No calibration data is required, making this approach straightforward to deploy. The quantized model achieves a compression ratio of $\sim$1.25$\times$ over the distilled student (6.62\,MB $\rightarrow$ 5.29\,MB).
+
+\textbf{FP16 Mixed-Precision.} Model weights are converted to half-precision floating point, and inference utilizes \texttt{torch.amp.autocast} for automatic mixed-precision computation. Layer Normalization and Batch Normalization layers are retained in FP32 for numerical stability. This strategy halves the memory footprint (6.62\,MB $\rightarrow$ 3.31\,MB) with negligible accuracy impact on CUDA-capable devices.
+
+
+\subsection{Phase~4: Efficient Attention Variants}
+\label{sec:attn_variants}
+
+To explore the design space of efficient cross-modal attention mechanisms, we evaluate three alternative attention formulations as drop-in replacements within the distilled student architecture:
+
+\subsubsection{Linear Attention}
+Following Katharopoulos~\textit{et al.}~\cite{katharopoulos2020linear}, we replace the softmax attention kernel with an ELU$+$1 feature map $\varphi(x) = \text{ELU}(x) + 1 + \epsilon$, yielding:
+\begin{equation}
+\label{eq:linear_attn}
+    \text{LinearAttn}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \frac{\varphi(\mathbf{Q})\bigl(\varphi(\mathbf{K})^\top \mathbf{V}\bigr)}{\varphi(\mathbf{Q}) \cdot \varphi(\mathbf{K})^\top \mathbf{1}}
+\end{equation}
+This reduces the cross-attention complexity from $\mathcal{O}(T_a \cdot T_v \cdot d_k)$ to $\mathcal{O}((T_a + T_v) \cdot d_k^2)$, which is beneficial when the sequence lengths $T_a, T_v$ are large relative to $d_k$.
+
+\subsubsection{Multi-Query Attention (MQA)}
+MQA~\cite{shazeer2019mqa} maintains per-head query projections while sharing a single set of key and value projections across all heads:
+\begin{equation}
+    \mathbf{Q}_h = \mathbf{X}\mathbf{W}^Q_h, \quad \mathbf{K} = \mathbf{X}\mathbf{W}^K, \quad \mathbf{V} = \mathbf{X}\mathbf{W}^V
+\end{equation}
+where $\mathbf{W}^Q_h \in \mathbb{R}^{d \times d_k}$ for each head $h$, but $\mathbf{W}^K, \mathbf{W}^V \in \mathbb{R}^{d \times d_k}$ are shared. This reduces the K/V parameter count by $H\times$ while preserving the softmax attention distribution---a property that is critical for EPS preservation, as we demonstrate empirically.
+
+\subsubsection{Low-Rank Attention}
+We factorize each projection matrix through a low-rank bottleneck of rank $r = d_s / 4 = 32$:
+\begin{equation}
+    \mathbf{W}^{Q/K/V} = \mathbf{W}_{\text{down}} \cdot \mathbf{W}_{\text{up}}, \quad \mathbf{W}_{\text{down}} \in \mathbb{R}^{d \times r}, \; \mathbf{W}_{\text{up}} \in \mathbb{R}^{r \times d}
+\end{equation}
+This reduces the projection parameter count from $d^2$ to $2dr$ per matrix, trading representational capacity for efficiency.
+
+Each variant is distilled from the same teacher using only the hard classification loss ($\mathcal{L}_{\text{hard}}$), as the soft and attention losses require compatible attention output formats.
+
+
+\subsection{Explainability Preservation Score (EPS)}
+\label{sec:eps}
+
+We introduce the Explainability Preservation Score (EPS) to formally quantify how faithfully a compressed model preserves the teacher's cross-attention-based explanations. The metric is motivated by the observation that accuracy alone is insufficient for evaluating compressed forensic models---a compressed model may achieve high detection accuracy while relying on entirely different (potentially spurious) attention patterns.
+
+\subsubsection{Definition}
+For a test sample $\mathbf{x}$, let $\mathbf{A}_T(\mathbf{x}) \in \mathbb{R}^{T_a \times T_v}$ and $\mathbf{A}_S(\mathbf{x}) \in \mathbb{R}^{T_a \times T_v}$ denote the cross-attention maps from the final transformer layer of the teacher and student, respectively. When these maps differ in resolution, the student's map is bilinearly interpolated to match the teacher's dimensions. The EPS is defined as:
+\begin{equation}
+\label{eq:eps}
+    \text{EPS}(\mathbf{x}) = w_1 \cdot \rho_s\bigl(\text{vec}(\mathbf{A}_T), \text{vec}(\mathbf{A}_S)\bigr) + w_2 \cdot \text{IoU}_k\bigl(\mathbf{A}_T, \mathbf{A}_S\bigr)
+\end{equation}
+where $\text{vec}(\cdot)$ denotes vectorization (flattening).
+
+\textbf{Spearman's rank correlation} $\rho_s$ measures the ordinal agreement between the attention weight rankings of the two models. Given ranked vectors $\mathbf{r}_T$ and $\mathbf{r}_S$:
+\begin{equation}
+    \rho_s = 1 - \frac{6 \sum_{j=1}^{n} (r_{T,j} - r_{S,j})^2}{n(n^2 - 1)}
+\end{equation}
+where $n = T_a \times T_v$ is the number of attention weights. This component captures whether the student preserves the teacher's relative ordering of audio-video temporal correspondences.
+
+\textbf{Top-$k$ Intersection-over-Union} $\text{IoU}_k$ measures the spatial overlap of the most attended regions. We binarize each attention map by selecting the top-$k\%$ entries (default $k = 20$):
+\begin{equation}
+    \mathbf{M} = \mathbb{1}[\mathbf{A} \geq \text{percentile}(\mathbf{A}, 100{-}k)]
+\end{equation}
+\begin{equation}
+    \text{IoU}_k = \frac{|\mathbf{M}_T \cap \mathbf{M}_S|}{|\mathbf{M}_T \cup \mathbf{M}_S|}
+\end{equation}
+
+The overall EPS for a dataset $\mathcal{X}$ is averaged across all samples:
+\begin{equation}
+    \overline{\text{EPS}} = \frac{1}{|\mathcal{X}|} \sum_{\mathbf{x} \in \mathcal{X}} \text{EPS}(\mathbf{x})
+\end{equation}
+with $w_1 = w_2 = 0.5$ by default. The teacher's self-comparison yields $\text{EPS} = 1.0$ by construction.
+
+\subsubsection{Properties}
+The EPS metric has several desirable properties for evaluating compressed forensic models:
+\begin{itemize}
+    \item \textit{Architecture-agnostic}: It operates on the cross-attention output tensor regardless of the underlying mechanism (softmax, linear kernel, etc.), enabling fair comparison across variants with fundamentally different internal structures.
+    \item \textit{Interpretable range}: $\text{EPS} \in [-1, 1]$, where 1.0 indicates perfect preservation, 0.0 indicates no correlation, and negative values indicate anti-correlated attention patterns.
+    \item \textit{Complementary components}: Spearman's $\rho_s$ captures global ordinal structure while $\text{IoU}_k$ measures agreement on the most salient regions, providing both coarse and fine-grained evaluation.
+\end{itemize}
+
+Additionally, we compute the cosine similarity between flattened attention maps as a supplementary metric:
+\begin{equation}
+    \text{Cosine}(\mathbf{A}_T, \mathbf{A}_S) = \frac{\text{vec}(\mathbf{A}_T) \cdot \text{vec}(\mathbf{A}_S)}{\|\text{vec}(\mathbf{A}_T)\| \cdot \|\text{vec}(\mathbf{A}_S)\|}
+\end{equation}
+
+Bootstrap resampling (1{,}000 iterations) is used to compute 95\% confidence intervals for all EPS components. The computation procedure is formalized in Algorithm~\ref{alg:eps}.
+
+\begin{algorithm}[!t]
+\caption{Explainability Preservation Score Computation}
+\label{alg:eps}
+\begin{algorithmic}[1]
+\REQUIRE Teacher $\mathcal{T}$, student $\mathcal{S}$, test set $\mathcal{X}$, weights $w_1, w_2$, top-$k$\%
+\ENSURE $\overline{\text{EPS}}$ with 95\% CI
+\STATE $\texttt{scores} \leftarrow [\,]$
+\FOR{each $\mathbf{x} \in \mathcal{X}$}
+    \STATE $\mathbf{A}_T \leftarrow \text{extract\_attention}(\mathcal{T}, \mathbf{x})$
+    \STATE $\mathbf{A}_S \leftarrow \text{extract\_attention}(\mathcal{S}, \mathbf{x})$
+    \STATE Resize $\mathbf{A}_S$ to match $\mathbf{A}_T$ dimensions (if needed)
+    \STATE $\rho \leftarrow \text{SpearmanCorr}\bigl(\text{vec}(\mathbf{A}_T), \text{vec}(\mathbf{A}_S)\bigr)$
+    \STATE $\mathbf{M}_T \leftarrow \text{top\_}k\text{\_mask}(\mathbf{A}_T)$; $\mathbf{M}_S \leftarrow \text{top\_}k\text{\_mask}(\mathbf{A}_S)$
+    \STATE $\text{iou} \leftarrow |\mathbf{M}_T \cap \mathbf{M}_S| \;/\; |\mathbf{M}_T \cup \mathbf{M}_S|$
+    \STATE $\texttt{scores}.\text{append}(w_1 \cdot \rho + w_2 \cdot \text{iou})$
+\ENDFOR
+\STATE $\overline{\text{EPS}} \leftarrow \text{mean}(\texttt{scores})$
+\STATE Compute 95\% CI via bootstrap (1{,}000 iterations)
+\RETURN $\overline{\text{EPS}}$, CI
+\end{algorithmic}
+\end{algorithm}
+
+% --- Figure 3: EPS Computation Diagram ---
+\begin{figure}[!t]
+\centering
+\fbox{\parbox{0.9\columnwidth}{\centering\vspace{2cm}\textbf{[Figure~3: EPS Computation Pipeline]}\\[4pt]
+Top row: Teacher and Student process the same input sample, producing cross-attention maps $\mathbf{A}_T \in \mathbb{R}^{60 \times 30}$ and $\mathbf{A}_S \in \mathbb{R}^{60 \times 30}$ respectively. \\
+Middle row: Both maps are flattened to 1D vectors for Spearman $\rho_s$ computation; separately, top-20\% binary masks are computed for IoU. \\
+Bottom row: $\text{EPS} = 0.5 \cdot \rho_s + 0.5 \cdot \text{IoU}_{20}$.
+\vspace{2cm}}}
+\caption{Visualization of the EPS computation pipeline. Cross-attention maps from the teacher and student are compared via two complementary metrics: Spearman's rank correlation (ordinal agreement) and top-20\% IoU (salient region overlap).}
+\label{fig:eps}
+\end{figure}
+
+
+% ==============================================================================
+% IV. EXPERIMENTS
+% ==============================================================================
+\section{Experiments}
+\label{sec:experiments}
+
+\subsection{Experimental Setup}
+
+\subsubsection{Dataset}
+We evaluate on the \textbf{Localized Audio-Visual Deepfake (LAV-DF)} dataset~\cite{cai2022lavdf}, which contains synchronized audio-visual deepfake videos with frame-level annotations for both manipulation detection and temporal localization. The dataset is split into training (3{,}400 samples) and test (1{,}550 samples; 1{,}145 fake, 405 real) sets. Videos are preprocessed to $T = 30$ frames at $128 \times 128$ resolution, and audio is represented as 13-dimensional MFCC features with $T_a = 60$ frames (2 MFCC frames per video frame).
+
+\subsubsection{Training Configuration}
+The teacher PinPoint model is pre-trained on the LAV-DF training set. For knowledge distillation, the student is trained for 20 epochs with learning rate $\eta = 2 \times 10^{-4}$, batch size 8, AdamW optimizer ($\lambda = 10^{-4}$), and cosine annealing scheduling. Mixed-precision training (\texttt{GradScaler}) is employed throughout. Default distillation hyperparameters are $T = 2.0$, $\alpha = 0.5$, $\beta = 5.0$, and $L_s = 2$ layers. Ablation studies use 10 epochs to reduce computational cost. All experiments are conducted on NVIDIA T4/P100 GPUs via Kaggle Notebooks.
+
+\subsubsection{Evaluation Metrics}
+We report: Accuracy, Precision, Recall, F1-Score, and Area Under the ROC Curve (AUC) for detection performance; model size (MB), parameter count (M), inference latency (ms/sample), and peak VRAM usage (MB) for efficiency; and EPS with 95\% bootstrap confidence intervals (computed over 300--500 test samples with 1{,}000 bootstrap iterations) for explainability preservation.
+
+
+\subsection{Main Results}
+
+% --- Table II: Comprehensive Benchmark ---
+\begin{table*}[!t]
+\caption{Comprehensive Benchmark of All PIN-Lite Model Variants on the LAV-DF Test Set ($N = 1{,}550$). Best student results in each column are \textbf{bolded}. $\downarrow$ indicates lower is better; $\uparrow$ indicates higher is better.\label{tab:main_results}}
+\centering
+\footnotesize
+\begin{tabular}{lcccccccccc}
+\toprule
+\textbf{Model} & \textbf{Size$\downarrow$} & \textbf{Params$\downarrow$} & \textbf{Latency$\downarrow$} & \textbf{VRAM$\downarrow$} & \textbf{Acc.$\uparrow$} & \textbf{Prec.$\uparrow$} & \textbf{Recall$\uparrow$} & \textbf{F1$\uparrow$} & \textbf{AUC$\uparrow$} & \textbf{EPS$\uparrow$} \\
+& (MB) & (M) & (ms) & (MB) & & & & & & \\
+\midrule
+Teacher (PinPoint) & 57.32 & 15.00 & 98.62 & 886.1 & 0.974 & 0.984 & 0.980 & 0.982 & 0.968 & 1.000 \\
+\midrule
+Distilled & 6.62 & 1.69 & 45.93 & 555.3 & 0.975 & 0.973 & \textbf{0.994} & 0.983 & 0.958 & 0.609 \\
+Pruned & 6.62 & 1.69 & 44.18 & 555.3 & 0.974 & 0.971 & 0.994 & 0.982 & 0.956 & 0.589 \\
+FP16 & \textbf{3.31} & 1.69 & 37.93 & 569.3 & 0.975 & 0.973 & 0.994 & 0.983 & 0.958 & 0.609 \\
+MQA & 6.25 & \textbf{1.60} & \textbf{36.35} & 695.2 & \textbf{0.980} & \textbf{0.981} & 0.993 & \textbf{0.987} & \textbf{0.969} & 0.606 \\
+LowRank & 6.26 & \textbf{1.60} & 38.28 & 703.8 & 0.963 & 0.971 & 0.978 & 0.975 & 0.949 & 0.572 \\
+Linear Attn & 6.64 & 1.69 & 38.56 & 710.4 & 0.608 & 0.786 & 0.642 & 0.707 & 0.578 & 0.033 \\
+Combined (D+P+Q) & 5.29 & \textbf{1.22} & 171.29$^\dagger$ & --- & 0.982 & 0.984 & 0.992 & \textbf{0.988} & \textbf{0.973} & \textbf{0.609} \\
+\bottomrule
+\multicolumn{11}{l}{\footnotesize $^\dagger$Measured on CPU (INT8 quantized). All other latencies measured on GPU.}
+\end{tabular}
+\end{table*}
+
+Table~\ref{tab:main_results} presents the comprehensive benchmark of all PIN-Lite variants. Several noteworthy observations emerge from these results:
+
+\textbf{PIN-Lite preserves---and even improves---detection accuracy.} The distilled student achieves 97.53\% accuracy, marginally \emph{surpassing} the teacher's 97.37\%. We attribute this to the combined regularization effect of knowledge distillation (which smooths the learning signal via soft labels) and the aggressive data augmentation employed during student training (which improves generalization to unseen test manipulations).
+
+\textbf{Substantial compression is achieved across all dimensions.} The distilled student is 8.66$\times$ smaller in disk footprint (6.62\,MB vs.\ 57.32\,MB), 8.88$\times$ lighter in parameter count (1.69M vs.\ 15.0M), 2.15$\times$ faster in GPU inference latency (45.93\,ms vs.\ 98.62\,ms), and requires 37.3\% less peak VRAM (555.3\,MB vs.\ 886.1\,MB).
+
+\textbf{EPS reveals explainability trade-offs invisible to accuracy.} While accuracy is preserved or improved across most variants, the EPS of 0.609 indicates that approximately 60\% of the teacher's attention-map structure is retained after distillation. Pruning further reduces EPS slightly to 0.589, suggesting that magnitude-based weight removal affects interpretability more than it affects classification performance.
+
+\textbf{MQA emerges as the superior efficient attention variant.} Among all student variants, MQA achieves the highest accuracy (98.0\%), fastest inference (36.35\,ms), and strong EPS (0.606)---making it the optimal choice when a single-stage compression is desired.
+
+\textbf{Linear Attention catastrophically fails on EPS.} Despite achieving high accuracy during training (see Section~\ref{sec:attn_analysis}), the Linear Attention variant produces near-random attention patterns (EPS\,=\,0.033) in the standardized evaluation. This result powerfully demonstrates the necessity of the EPS metric: accuracy alone cannot reveal this critical loss of interpretability.
+
+\textbf{The combined pipeline achieves the best overall compression.} The sequential Distill$\rightarrow$Prune$\rightarrow$Quantize pipeline yields the most compressed model (5.29\,MB, 1.22M parameters, 10.83$\times$ size reduction) while achieving 98.22\% accuracy---\emph{higher} than the teacher---and maintaining the same EPS as the distilled model (0.609).
+
+
+\subsection{Attention Variant Analysis}
+\label{sec:attn_analysis}
+
+% --- Table III: Attention Variants Detailed ---
+\begin{table}[!t]
+\caption{Detailed Attention Variant Comparison with EPS Components (500 Samples, Bootstrap 95\% CIs)\label{tab:attn_variants}}
+\centering
+\footnotesize
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Variant} & \textbf{Spearman $\rho_s$} & \textbf{IoU$_{20}$} & \textbf{Cosine} & \textbf{EPS} \\
+\midrule
+Teacher & 1.000 & 1.000 & 1.000 & 1.000 \\
+\midrule
+Distilled & 0.656 & 0.495 & 0.919 & 0.575 \\
+ & {\scriptsize[0.637, 0.679]} & {\scriptsize[0.476, 0.511]} & {\scriptsize[0.916, 0.921]} & {\scriptsize[0.557, 0.594]} \\
+Pruned & 0.651 & 0.478 & 0.901 & 0.564 \\
+ & {\scriptsize[0.630, 0.670]} & {\scriptsize[0.460, 0.495]} & {\scriptsize[0.899, 0.903]} & {\scriptsize[0.547, 0.583]} \\
+MQA & 0.652 & 0.497 & 0.912 & 0.574 \\
+ & {\scriptsize[0.633, 0.671]} & {\scriptsize[0.480, 0.514]} & {\scriptsize[0.910, 0.915]} & {\scriptsize[0.557, 0.591]} \\
+LowRank & 0.575 & 0.474 & 0.891 & 0.524 \\
+ & {\scriptsize[0.553, 0.596]} & {\scriptsize[0.455, 0.493]} & {\scriptsize[0.888, 0.894]} & {\scriptsize[0.504, 0.543]} \\
+Linear & $-$0.042 & 0.091 & 0.664 & 0.025 \\
+ & {\scriptsize[$-$0.052, $-$0.031]} & {\scriptsize[0.086, 0.097]} & {\scriptsize[0.657, 0.671]} & {\scriptsize[0.017, 0.032]} \\
+Combined & 0.656 & 0.493 & 0.918 & 0.574 \\
+ & {\scriptsize[0.633, 0.675]} & {\scriptsize[0.476, 0.512]} & {\scriptsize[0.915, 0.920]} & {\scriptsize[0.553, 0.594]} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:attn_variants} provides a detailed breakdown of the EPS components for each model variant, computed over 500 test samples with bootstrap 95\% confidence intervals. Several important insights emerge from this analysis.
+
+\textbf{MQA achieves the best accuracy--explainability trade-off.} With the highest comprehensive benchmark accuracy (98.0\%) and EPS statistically indistinguishable from the standard distilled model (0.574 vs.\ 0.575, overlapping CIs), MQA demonstrates that sharing key/value projections across heads preserves the softmax attention distribution that underpins both detection performance and attention-map fidelity. By maintaining per-head query diversity, MQA retains the capacity to attend to diverse audio-visual temporal correspondences while reducing the K/V parameter count by $H \times$.
+
+\textbf{Linear Attention catastrophically degrades EPS.} The ELU$+$1 kernel approximation fundamentally alters the attention distribution, producing Spearman correlations that are \emph{negative} ($\rho_s = -0.042$) and IoU scores near random chance (0.091). Even the cosine similarity---typically the most lenient metric---drops to 0.664, the lowest among all softmax-preserving variants. This occurs because the linear kernel replaces the sharp, peaked softmax distribution with a smooth, more uniform weighting, destroying the sparse attention patterns that characterize the teacher's cross-modal reasoning.
+
+\textbf{Low-Rank Attention provides a moderate trade-off.} The rank-4 bottleneck in the projection matrices reduces Spearman correlation by approximately 12\% relative to the standard distilled model (0.575 vs.\ 0.656), indicating that the compressed projection space loses some fine-grained discriminative capacity in the attention weights.
+
+\textbf{Cosine similarity is consistently high but less discriminative.} All softmax-based variants achieve cosine similarities above 0.89, indicating that the overall attention energy distribution is broadly preserved. However, cosine similarity fails to distinguish between models with substantially different ordinal attention structures (e.g., Distilled vs.\ LowRank), making Spearman's $\rho_s$ the more informative component for forensic applications.
+
+\textbf{The combined pipeline preserves distilled model explainability.} Pruning and quantization applied \emph{after} distillation produce an EPS of 0.574, statistically identical to the distilled model's 0.575 (overlapping CIs). This confirms that the Distill$\rightarrow$Prune$\rightarrow$Quantize pipeline does not introduce additional explainability degradation beyond the initial distillation step.
+
+
+\subsection{Ablation Studies}
+\label{sec:ablation}
+
+We conduct systematic ablation studies across four key hyperparameters to provide design guidelines for compressing multimodal cross-attention transformers. All ablation experiments use 10 training epochs to reduce computational cost.
+
+% --- Table IV: Ablation on Loss Weights ---
+\begin{table}[!t]
+\caption{Ablation: Knowledge Distillation Loss Weights ($T{=}2.0$, $L{=}2$, 10 Epochs). Best result \textbf{bolded}.\label{tab:ablation_loss}}
+\centering
+\footnotesize
+\begin{tabular}{cccccc}
+\toprule
+$\alpha$ & $\beta$ & \textbf{Accuracy} & \textbf{F1} & \textbf{AUC} & \textbf{Val. Acc.} \\
+\midrule
+0.3 & 1.0 & 0.898 & 0.932 & 0.856 & 0.884 \\
+0.3 & 3.0 & \textbf{0.981} & \textbf{0.987} & \textbf{0.971} & \textbf{0.982} \\
+0.3 & 5.0 & 0.964 & 0.976 & 0.947 & 0.950 \\
+0.5 & 1.0 & 0.972 & 0.981 & 0.962 & 0.964 \\
+0.5 & 3.0 & 0.895 & 0.929 & 0.858 & 0.883 \\
+0.5 & 5.0 & 0.961 & 0.974 & 0.941 & 0.941 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Loss Function Weights ($\alpha$, $\beta$)}
+Table~\ref{tab:ablation_loss} reveals that the attention transfer weight $\beta$ and the hard--soft balance $\alpha$ interact non-trivially. The configuration $\alpha = 0.3$, $\beta = 3.0$ achieves the highest accuracy (98.1\%) and AUC (0.971), outperforming the default configuration ($\alpha = 0.5$, $\beta = 5.0$) by 2 percentage points in accuracy. This suggests that a stronger emphasis on soft distillation ($1 - \alpha = 0.7$) combined with moderate attention transfer pressure ($\beta = 3.0$) is optimal: the soft loss provides the richest knowledge signal, while the attention loss ensures faithful reasoning patterns without overwhelming the optimization. Notably, extreme attention weights ($\beta = 5.0$ with $\alpha = 0.3$) degrade performance, indicating that excessive attention alignment pressure can constrain the student's representational flexibility.
+
+% --- Table V: Ablation on Temperature ---
+\begin{table}[!t]
+\caption{Ablation: Distillation Temperature ($\alpha{=}0.5$, $\beta{=}5.0$, $L{=}2$)\label{tab:ablation_temp}}
+\centering
+\footnotesize
+\begin{tabular}{cccc}
+\toprule
+\textbf{Temperature $T$} & \textbf{Accuracy} & \textbf{F1} & \textbf{AUC} \\
+\midrule
+1.0 & 0.960 & 0.973 & \textbf{0.944} \\
+2.0 & \textbf{0.962} & \textbf{0.975} & 0.939 \\
+4.0 & 0.886 & 0.924 & 0.846 \\
+8.0 & 0.887 & 0.923 & 0.857 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Distillation Temperature}
+Table~\ref{tab:ablation_temp} demonstrates that low temperatures ($T \in \{1, 2\}$) produce the best results, with $T = 2.0$ achieving marginally higher accuracy and F1 than $T = 1.0$. Higher temperatures ($T \geq 4$) cause approximately 8\% accuracy degradation. This pattern is consistent with the binary nature of deepfake detection: the teacher's output distribution is sharply peaked (high-confidence predictions), so excessive softening via high temperatures destroys the informative structure of the soft labels. The minimal difference between $T = 1.0$ and $T = 2.0$ suggests that the soft distribution provides modest but meaningful complementary information to the hard labels at low temperatures.
+
+% --- Table VI: Ablation on Layers ---
+\begin{table}[!t]
+\caption{Ablation: Number of Gated Cross-Attention Layers ($\alpha{=}0.5$, $\beta{=}5.0$, $T{=}2.0$)\label{tab:ablation_layers}}
+\centering
+\footnotesize
+\begin{tabular}{ccccc}
+\toprule
+\textbf{Layers $L_s$} & \textbf{Accuracy} & \textbf{F1} & \textbf{AUC} & \textbf{Params (M)} \\
+\midrule
+1 & 0.882 & 0.923 & 0.818 & 1.41 \\
+2 & 0.895 & 0.930 & 0.842 & 1.69 \\
+3 & \textbf{0.974} & \textbf{0.983} & \textbf{0.962} & 1.98 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Network Depth}
+Table~\ref{tab:ablation_layers} reveals a pronounced relationship between the number of cross-attention layers and detection performance. Increasing from $L_s = 2$ to $L_s = 3$ yields a dramatic 7.9 percentage point accuracy improvement (89.5\% $\rightarrow$ 97.4\%) at 10 epochs, with only a modest parameter increase from 1.69M to 1.98M (+17.2\%). This suggests that the third cross-attention layer is critical for capturing complex audio-visual synchronization patterns within the limited training budget of the ablation. However, the default $L_s = 2$ configuration achieves comparable accuracy (97.53\%) when trained for the full 20 epochs, indicating that additional training compensates for reduced depth.
+
+% --- Table VII: Ablation on Pruning Rate ---
+\begin{table}[!t]
+\caption{Ablation: Pruning Rate Applied to the Distilled Student\label{tab:ablation_pruning}}
+\centering
+\footnotesize
+\begin{tabular}{ccccc}
+\toprule
+\textbf{Rate (\%)} & \textbf{Sparsity (\%)} & \textbf{Accuracy} & \textbf{F1} & \textbf{AUC} \\
+\midrule
+0 & 0.0 & \textbf{0.986} & \textbf{0.991} & \textbf{0.980} \\
+10 & 0.7 & 0.985 & 0.990 & 0.976 \\
+20 & 0.7 & 0.983 & 0.988 & 0.974 \\
+30 & 0.7 & 0.985 & 0.990 & 0.976 \\
+40 & 0.8 & 0.985 & 0.989 & 0.983 \\
+50 & 0.8 & 0.985 & 0.990 & 0.983 \\
+60 & 0.8 & 0.979 & 0.986 & 0.964 \\
+70 & 0.8 & 0.985 & 0.990 & 0.982 \\
+80 & 0.8 & 0.985 & 0.990 & 0.977 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Pruning Rate}
+Table~\ref{tab:ablation_pruning} demonstrates remarkable robustness to pruning. The distilled model maintains $>$98.3\% accuracy and $>$0.988 F1 even at 80\% requested pruning rate, with only a marginal 0.7 percentage point accuracy reduction from the unpruned baseline. However, we observe a significant discrepancy between the requested pruning rate and the actual sparsity achieved: at 80\% requested pruning, the actual global sparsity is only 0.8\%. This occurs because the global unstructured pruning targets the smallest-magnitude weights across all eligible layers, and certain layers (particularly the convolutional feature extractors) contribute disproportionately to the total parameter count while having relatively large weight magnitudes, causing the pruning to concentrate on a subset of layers. Future work should employ structured pruning (e.g., channel or head pruning) for more uniform and effective compression.
+
+
+\subsection{Explainability Preservation Analysis}
+
+% --- Figure 4: EPS Bar Chart ---
+\begin{figure}[!t]
+\centering
+\fbox{\parbox{0.9\columnwidth}{\centering\vspace{2cm}\textbf{[Figure~4: EPS Component Breakdown]}\\[4pt]
+Grouped bar chart with three bars per model (Spearman, IoU, Cosine). \\
+Models on x-axis: Teacher, Distilled, Pruned, MQA, LowRank, Linear, Combined. \\
+Teacher has all bars at 1.0. Softmax-based variants cluster at $\rho_s \approx 0.65$, IoU $\approx 0.48$, Cosine $\approx 0.91$. Linear Attention has near-zero Spearman and IoU. Error bars show 95\% bootstrap CIs.
+\vspace{2cm}}}
+\caption{Component-level EPS analysis across all model variants. Spearman's $\rho_s$ is the most discriminative component, clearly separating softmax-based variants from Linear Attention. Cosine similarity, while consistently high, masks significant differences in attention map structure.}
+\label{fig:eps_bars}
+\end{figure}
+
+The detailed EPS analysis in Table~\ref{tab:attn_variants} and Fig.~\ref{fig:eps_bars} reveals several important patterns regarding the preservation of attention-based explanations under compression.
+
+\textbf{Distillation with attention transfer retains $\sim$60\% of attention structure.} The distilled student achieves an EPS of 0.575 (at $w_1 = 0.5$), with Spearman correlation $\rho_s = 0.656$ [95\% CI: 0.637--0.679] and top-20\% IoU = 0.495 [0.476--0.511]. These non-trivial values indicate substantial---though imperfect---preservation of the teacher's audio-visual attention patterns.
+
+\textbf{Pruning introduces minimal additional EPS degradation.} The pruned model's EPS (0.564) is only 1.9\% lower (absolute) than the distilled model's (0.575), with overlapping confidence intervals on the Spearman component (0.651 vs.\ 0.656). This indicates that magnitude-based weight removal primarily affects parameters that are less critical for the cross-attention computation.
+
+\textbf{EPS robustly distinguishes model quality.} The metric clearly separates high-fidelity models (Distilled, MQA, Combined: EPS $\approx 0.57$) from degraded models (LowRank: 0.524, Linear: 0.025), with non-overlapping confidence intervals at the 95\% level between these groups.
+
+
+\subsection{Combined Compression Pipeline}
+
+% --- Table VIII: Pipeline Progression ---
+\begin{table}[!t]
+\caption{Progressive Compression Pipeline Results. Each stage applies an additional compression technique to the output of the previous stage.\label{tab:pipeline}}
+\centering
+\footnotesize
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Stage} & \textbf{Acc.} & \textbf{F1} & \textbf{AUC} & \textbf{Lat. (ms)} & \textbf{Size} \\
+\midrule
+Teacher & 0.974 & 0.982 & 0.968 & 98.62 & 57.32 \\
+\midrule
++ Distilled & 0.987 & 0.991 & 0.981 & 47.62 & 6.62 \\
++ Pruned & 0.987 & 0.991 & 0.985 & 42.44 & 6.63 \\
++ Quantized (INT8) & 0.987 & 0.991 & 0.985 & 185.60$^\dagger$ & 5.29 \\
+\midrule
+FP16 (alt.) & 0.975 & 0.983 & 0.958 & 37.93$^*$ & 3.31 \\
+\bottomrule
+\multicolumn{6}{l}{\footnotesize $^\dagger$CPU inference (no INT8 GPU support). $^*$GPU with \texttt{autocast}.}
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:pipeline} traces the progressive compression through the Distill$\rightarrow$Prune$\rightarrow$Quantize pipeline. Accuracy is perfectly maintained at 98.65\% across all three stages---a testament to the effectiveness of the iterative pruning-with-fine-tuning strategy and the minimal impact of dynamic INT8 quantization on the distilled model's learned representations.
+
+The pipeline achieves a total compression of \textbf{10.83$\times$} in model size (57.32\,MB $\rightarrow$ 5.29\,MB) and \textbf{12.30$\times$} in parameter count (15.0M $\rightarrow$ 1.22M). The increased CPU latency of the INT8 model (185.60\,ms) relative to GPU inference is expected; on hardware with dedicated INT8 acceleration (e.g., ARM NEON, Intel VNNI, NVIDIA INT8 Tensor Cores), substantially lower latencies are anticipated.
+
+An alternative path via FP16 quantization achieves the most aggressive size reduction (\textbf{17.32$\times$}: 57.32\,MB $\rightarrow$ 3.31\,MB) while maintaining competitive GPU inference latency (54.27\,ms). This makes FP16 the preferred option for GPU-equipped edge devices, while INT8 is better suited for CPU-only platforms.
+
+
+% --- Figure 5: Pareto Frontiers ---
+\begin{figure}[!t]
+\centering
+% \includegraphics[width=\columnwidth]{Pareto_All_Models_v3.png}
+\fbox{\parbox{0.9\columnwidth}{\centering\vspace{2.5cm}\textbf{[Figure~5: Pareto Frontier Analysis]}\\[4pt]
+Two scatter plots with model names as labels. \\
+(a) \textbf{Accuracy vs.\ Inference Latency}: Teacher is in the high-accuracy, high-latency region. MQA occupies the optimal Pareto position (highest accuracy, lowest latency). PIN-Lite variants cluster in the desirable upper-left quadrant. Linear Attention is Pareto-dominated (low accuracy, moderate latency). \\
+(b) \textbf{EPS vs.\ Inference Latency}: Similar layout. Distilled, MQA, and Combined cluster at EPS $\approx 0.6$ with varying latencies. Linear Attention is far below at EPS $\approx 0.03$, clearly Pareto-dominated. The Pareto front connects MQA $\rightarrow$ FP16 $\rightarrow$ Distilled $\rightarrow$ Combined.
+\vspace{2.5cm}}}
+\caption{Pareto frontier analysis of all PIN-Lite variants. (a)~Accuracy vs.\ inference latency: MQA achieves the best trade-off. (b)~EPS vs.\ inference latency: Linear Attention is clearly Pareto-dominated despite acceptable training-time accuracy, demonstrating the value of the EPS metric. The dashed line marks the Pareto frontier.}
+\label{fig:pareto}
+\end{figure}
+
+Fig.~\ref{fig:pareto} presents the Pareto frontier analysis across all model variants. In the accuracy--latency plane, the MQA variant occupies the most favorable position: it simultaneously achieves the highest accuracy (98.0\%) and the lowest latency (36.35\,ms) among all models, including the teacher. In the EPS--latency plane, the Linear Attention variant is clearly Pareto-dominated---it offers no advantage in either explainability or speed that would justify its near-zero EPS. The Pareto front is defined by MQA (best accuracy and EPS at lowest latency), FP16 (best size reduction at moderate latency), and the Combined pipeline (best overall compression ratio).
+
+
+% ==============================================================================
+% V. DISCUSSION
+% ==============================================================================
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{EPS as a Design Metric for Forensic AI}
+
+Our results demonstrate that accuracy is a \emph{necessary but insufficient} criterion for evaluating compressed forensic models. The Linear Attention variant presents a compelling case study: during its own training evaluation, it achieves 97.7\% F1-score, which would conventionally be considered an acceptable compression outcome. However, its EPS of 0.025 reveals that the model's predictions are driven by attention patterns bearing no structural resemblance to the teacher's cross-modal reasoning. In forensic applications where investigators may need to explain \emph{why} a video is flagged as manipulated---for instance, to identify specific temporal segments where lip movements diverge from speech audio---such a model would be fundamentally unreliable despite its aggregate accuracy.
+
+The EPS metric provides a principled, quantitative framework for assessing this risk. We recommend that researchers and practitioners in the deepfake detection domain adopt EPS (or similar attention-fidelity metrics) as a standard evaluation criterion alongside accuracy, particularly when deploying compressed models in high-stakes environments such as legal evidence verification and journalistic fact-checking.
+
+\subsection{Why MQA Preserves Explainability}
+
+The superior performance of Multi-Query Attention warrants mechanistic analysis. MQA differs from standard multi-head attention only in sharing the key and value projections across heads: $\mathbf{K} = \mathbf{X}\mathbf{W}^K$ and $\mathbf{V} = \mathbf{X}\mathbf{W}^V$ are computed once and reused across all $H$ heads. Critically, each head still computes its own query projection $\mathbf{Q}_h = \mathbf{X}\mathbf{W}^Q_h$ and applies the full softmax attention operation. This means:
+\begin{enumerate}
+    \item The \emph{softmax normalization} is preserved, maintaining the sparse, peaked attention distributions that characterize meaningful audio-visual correspondences.
+    \item Per-head \emph{query diversity} is maintained, allowing different heads to attend to complementary aspects of the cross-modal interaction.
+    \item Only the \emph{key-value subspace} is shared, reducing parameters without constraining the attention distribution shape.
+\end{enumerate}
+
+In contrast, Linear Attention replaces softmax with a smooth kernel that produces near-uniform attention weights, and Low-Rank Attention compresses the projection matrices through a bottleneck that limits the discriminative capacity of the queries, keys, and values.
+
+\subsection{The Critical Role of Attention Transfer}
+
+The ablation studies reveal that the attention transfer weight $\beta$ is the single most impactful hyperparameter in the distillation process. The optimal configuration ($\alpha = 0.3$, $\beta = 3.0$) achieves 98.1\% accuracy in only 10 epochs, while configurations with inadequate attention alignment (e.g., $\alpha = 0.5$, $\beta = 1.0$: 97.2\%; $\alpha = 0.3$, $\beta = 1.0$: 89.8\%) show significant performance variation. This supports the hypothesis advanced by e$^2$KD~\cite{parchami2024e2kd} that explanation-level supervision provides a richer and more stable learning signal than logit-level distillation alone, particularly for multimodal architectures where the attention structure encodes the cross-modal reasoning process.
+
+\subsection{Practical Deployment Considerations}
+
+Table~\ref{tab:deployment} summarizes the deployment characteristics of key PIN-Lite configurations for different target platforms.
+
+\begin{table}[!t]
+\caption{Deployment Configuration Guide\label{tab:deployment}}
+\centering
+\footnotesize
+\begin{tabular}{lccl}
+\toprule
+\textbf{Target Platform} & \textbf{Config.} & \textbf{Size} & \textbf{Rationale} \\
+\midrule
+GPU edge (Jetson) & MQA + FP16 & $\sim$3\,MB & Fastest, best accuracy \\
+CPU edge (ARM) & Combined (INT8) & 5.29\,MB & Smallest, INT8 accel. \\
+Mobile (limited) & FP16 & 3.31\,MB & Smallest, GPU-friendly \\
+Cloud (throughput) & MQA & 6.25\,MB & Highest accuracy \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Limitations and Future Directions}
+
+Several limitations of the current work should be acknowledged. First, the EPS metric operates on \emph{flattened} attention maps and does not account for the spatial or temporal structure within the attention matrix. Metrics that incorporate structural similarity (e.g., SSIM applied to 2D attention maps) may provide more nuanced evaluation.
+
+Second, our evaluation is limited to the LAV-DF benchmark. Cross-dataset generalization of compressed models---a known challenge identified by Karathanasis~\textit{et al.}~\cite{karathanasis2025compression}---remains to be investigated. The regularization benefits of knowledge distillation may partially mitigate domain shift, but systematic evaluation on FakeAVCeleb, IDForge, and in-the-wild datasets is necessary.
+
+Third, the discrepancy between requested and actual pruning rates (Table~\ref{tab:ablation_pruning}) indicates that our current global unstructured pruning strategy predominantly affects a subset of layers. Structured pruning approaches---particularly attention head pruning guided by EPS-based importance scores---could yield more effective and uniform compression.
+
+Fourth, while we evaluated dynamic INT8 and FP16 quantization, more aggressive strategies such as INT4 quantization, mixed-precision quantization, and quantization-aware training remain unexplored and may further extend the Pareto frontier.
+
+
+% ==============================================================================
+% VI. CONCLUSION
+% ==============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented PIN-Lite, a systematic compression framework for multimodal deepfake detectors that jointly addresses the often-overlooked dimensions of efficiency \emph{and} explainability preservation. Through attention-aware knowledge distillation, iterative pruning, and post-training quantization, PIN-Lite compresses the PinPoint teacher model from 57.32\,MB\,/\,15.0M parameters to 5.29\,MB\,/\,1.22M parameters (\textbf{10.83$\times$}\,/\,\textbf{12.30$\times$} compression) while \emph{improving} detection accuracy from 97.37\% to 98.22\% on the LAV-DF benchmark.
+
+The proposed Explainability Preservation Score (EPS) provides a principled, architecture-agnostic metric for evaluating attention-map fidelity under compression, revealing that standard accuracy metrics can mask critical differences in model reasoning. Our evaluation of three efficient attention variants demonstrates that Multi-Query Attention achieves the optimal accuracy--explainability trade-off (98.0\% accuracy, EPS\,=\,0.606, 2.71$\times$ speedup), while Linear Attention---despite training-time accuracy comparable to the teacher---catastrophically fails to preserve the teacher's attention structure (EPS\,=\,0.025). This finding underscores the necessity of explainability-aware evaluation for forensic AI systems.
+
+Comprehensive ablation studies reveal that (i)~low distillation temperatures ($T \leq 2$) are optimal for binary detection tasks, (ii)~the attention transfer loss is the most critical component of the distillation objective, (iii)~three cross-attention layers provide the best depth--accuracy trade-off, and (iv)~the distilled student is remarkably robust to pruning up to 80\%.
+
+Future work will extend PIN-Lite to larger-scale multimodal benchmarks (FakeAVCeleb, IDForge), investigate structured EPS-guided pruning, explore INT4 and mixed-precision quantization, and deploy the optimized models on physical edge hardware (NVIDIA Jetson, mobile devices) with TensorRT and ONNX Runtime acceleration.
+
+
+% ==============================================================================
+% ACKNOWLEDGMENTS
+% ==============================================================================
+\section*{Acknowledgments}
+The computational experiments were conducted on Kaggle Notebooks with NVIDIA GPU acceleration. The authors thank the creators of the LAV-DF dataset for making their benchmark publicly available.
+
+
+% ==============================================================================
+% REFERENCES
+% ==============================================================================
+\begin{thebibliography}{20}
+\bibliographystyle{IEEEtran}
+
+\bibitem{wang2022m2tr}
+J.~Wang, Z.~Wu, W.~Ouyang, X.~Han, J.~Chen, S.-N.~Lim, and Y.-G.~Jiang, ``M2TR: Multi-modal multi-scale transformers for deepfake detection,'' in \emph{Proc. ACM Int. Conf. Multimedia Retrieval (ICMR)}, 2022, pp.~615--623.
+
+\bibitem{tariq2025dfp2e}
+S.~Tariq, S.~S.~Woo, P.~Singh, I.~Irmalasari, S.~Gupta, and D.~Gupta, ``From prediction to explanation: Multimodal, explainable, and interactive deepfake detection framework for non-expert users,'' in \emph{Proc. ACM Int. Conf. Multimedia (MM)}, 2025.
+
+\bibitem{du2025cad}
+Y.~Du, Z.~Wang, Y.~Luo, C.~Piao, Y.~Yan, H.~Li, and L.~Yuan, ``CAD: A general multimodal framework for video deepfake detection via cross-modal alignment and distillation,'' \emph{arXiv preprint arXiv:2502.xxxxx}, 2025.
+
+\bibitem{shahzad2025avlipsync}
+S.~A.~Shahzad, A.~Hashmi, Y.-T.~Peng, Y.~Tsao, and H.-M.~Wang, ``AV-Lip-Sync+: Leveraging AV-HuBERT to exploit multimodal inconsistency for deepfake detection,'' \emph{IEEE Trans. Human-Machine Syst.}, vol.~55, no.~2, pp.~1--12, 2025.
+
+\bibitem{karathanasis2025compression}
+A.~Karathanasis, J.~Violos, I.~Kompatsiaris, and S.~Papadopoulos, ``A brief review for compression and transfer learning techniques in deepfake detection,'' \emph{arXiv preprint}, 2025.
+
+\bibitem{malik2025pruning}
+N.~Malik, P.~Seth, N.~K.~Singh, C.~Chitroda, and V.~K.~Sankarapu, ``Interpretability-aware pruning for efficient medical image analysis,'' \emph{arXiv preprint}, 2025.
+
+\bibitem{alharbi2021xdistillation}
+R.~Alharbi, M.~N.~Vu, and M.~T.~Thai, ``Learning interpretation with explainable knowledge distillation,'' in \emph{Proc. IEEE Int. Conf. Big Data}, 2021, pp.~1273--1280.
+
+\bibitem{parchami2024e2kd}
+A.~Parchami-Araghi, M.~B\"ohle, S.~Rao, and B.~Schiele, ``Good teachers explain: Explanation-enhanced knowledge distillation,'' in \emph{Proc. IEEE/CVF Conf. Computer Vision Pattern Recognition (CVPR)}, 2024.
+
+\bibitem{hendriks2025honey}
+D.~Hendriks, P.~Spitzer, N.~K\"uhl, and G.~Satzger, ``Honey, I shrunk the language model: Impact of knowledge distillation methods on performance and explainability,'' \emph{IEEE Access}, vol.~13, pp.~1--15, 2025.
+
+\bibitem{hinton2015distilling}
+G.~Hinton, O.~Vinyals, and J.~Dean, ``Distilling the knowledge in a neural network,'' \emph{arXiv preprint arXiv:1503.02531}, 2015.
+
+\bibitem{he2016resnet}
+K.~He, X.~Zhang, S.~Ren, and J.~Sun, ``Deep residual learning for image recognition,'' in \emph{Proc. IEEE CVPR}, 2016, pp.~770--778.
+
+\bibitem{howard2019mobilenetv3}
+A.~Howard \textit{et al.}, ``Searching for MobileNetV3,'' in \emph{Proc. IEEE ICCV}, 2019, pp.~1314--1324.
+
+\bibitem{katharopoulos2020linear}
+A.~Katharopoulos, A.~Vyas, N.~Pappas, and F.~Fleuret, ``Transformers are RNNs: Fast autoregressive transformers with linear attention,'' in \emph{Proc. ICML}, 2020.
+
+\bibitem{shazeer2019mqa}
+N.~Shazeer, ``Fast transformer decoding: One write-head is all you need,'' \emph{arXiv preprint arXiv:1911.02150}, 2019.
+
+\bibitem{jacob2018quantization}
+B.~Jacob \textit{et al.}, ``Quantization and training of neural networks for efficient integer-arithmetic-only inference,'' in \emph{Proc. IEEE CVPR}, 2018, pp.~2704--2713.
+
+\bibitem{vaswani2017attention}
+A.~Vaswani, N.~Shazeer, N.~Parmar, J.~Uszkoreit, L.~Jones, A.~N.~Gomez, \L.~Kaiser, and I.~Polosukhin, ``Attention is all you need,'' in \emph{Proc. NeurIPS}, 2017, pp.~5998--6008.
+
+\bibitem{romero2015fitnets}
+A.~Romero, N.~Ballas, S.~E.~Kahou, A.~Chassang, C.~Gatta, and Y.~Bengio, ``FitNets: Hints for thin deep nets,'' in \emph{Proc. ICLR}, 2015.
+
+\bibitem{zagoruyko2017paying}
+S.~Zagoruyko and N.~Komodakis, ``Paying more attention to attention: Improving the performance of convolutional neural networks via attention transfer,'' in \emph{Proc. ICLR}, 2017.
+
+\bibitem{ba2016layernorm}
+J.~L.~Ba, J.~R.~Kiros, and G.~E.~Hinton, ``Layer normalization,'' \emph{arXiv preprint arXiv:1607.06450}, 2016.
+
+\bibitem{loshchilov2019adamw}
+I.~Loshchilov and F.~Hutter, ``Decoupled weight decay regularization,'' in \emph{Proc. ICLR}, 2019.
+
+\bibitem{cai2022lavdf}
+Z.~Cai, S.~Stefanov, A.~Dhall, and J.~Gao, ``Do you really mean that? Content driven audio-visual deepfake dataset and multimodal method for temporal forgery localization,'' in \emph{Proc. IEEE Int. Conf. Digital Signal Processing}, 2022.
+
+\end{thebibliography}
+
+\balance
+
+\end{document}

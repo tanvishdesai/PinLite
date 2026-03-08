@@ -1,0 +1,115 @@
+KNOWLEDGE DISTILLATION — MQA ATTENTION VARIANT
+Attention Type: mqa
+Student: EMBED_DIM=128, HEADS=4, LAYERS=2
+Device: cuda
+===== Epoch 1/20 =====
+Distilling E1:   0%|                                    | 0/425 [00:00<?, ?it/s]/kaggle/working/distillattenvariants.py:116: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast():
+Train -> Loss: 0.2906 (H:0.57, S:0.00, A:0.00), Acc: 0.7250
+Evaluating:   0%|                                       | 0/194 [00:00<?, ?it/s]/kaggle/working/PinPoint.py:2205: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast():
+Val   -> Loss: 0.5759, Acc: 0.7290
+  -> New best model saved: best_pinpoint_MQA_model.pth
+
+===== Epoch 2/20 =====
+Train -> Loss: 0.2589 (H:0.51, S:0.00, A:0.00), Acc: 0.7697
+Val   -> Loss: 0.4912, Acc: 0.7748
+  -> New best model saved: best_pinpoint_MQA_model.pth
+
+===== Epoch 3/20 =====
+Train -> Loss: 0.2145 (H:0.42, S:0.00, A:0.00), Acc: 0.8259
+Val   -> Loss: 0.4361, Acc: 0.8084
+  -> New best model saved: best_pinpoint_MQA_model.pth
+
+===== Epoch 4/20 =====
+Train -> Loss: 0.1850 (H:0.36, S:0.00, A:0.00), Acc: 0.8491
+Val   -> Loss: 0.3787, Acc: 0.8626
+  -> New best model saved: best_pinpoint_MQA_model.pth
+
+===== Epoch 5/20 =====
+Train -> Loss: 0.1051 (H:0.20, S:0.00, A:0.00), Acc: 0.9218
+Val   -> Loss: 0.1150, Acc: 0.9645
+  -> New best model saved: best_pinpoint_MQA_model.pth
+
+===== Epoch 6/20 =====
+Train -> Loss: 0.0514 (H:0.10, S:0.00, A:0.00), Acc: 0.9694
+Val   -> Loss: 0.0844, Acc: 0.9768
+  -> New best model saved: best_pinpoint_MQA_model.pth
+
+===== Epoch 7/20 =====
+Train -> Loss: 0.0403 (H:0.08, S:0.00, A:0.00), Acc: 0.9803
+Val   -> Loss: 0.1755, Acc: 0.9523
+
+===== Epoch 8/20 =====
+Train -> Loss: 0.0262 (H:0.05, S:0.00, A:0.00), Acc: 0.9850
+Val   -> Loss: 0.1141, Acc: 0.9774
+
+===== Epoch 9/20 =====
+Train -> Loss: 0.0251 (H:0.05, S:0.00, A:0.00), Acc: 0.9888
+Val   -> Loss: 0.1055, Acc: 0.9794
+
+===== Epoch 10/20 =====
+Train -> Loss: 0.0216 (H:0.04, S:0.00, A:0.00), Acc: 0.9894
+Val   -> Loss: 0.0738, Acc: 0.9845
+  -> New best model saved: best_pinpoint_MQA_model.pth
+
+===== Epoch 11/20 =====
+Train -> Loss: 0.0152 (H:0.03, S:0.00, A:0.00), Acc: 0.9947
+Val   -> Loss: 0.0994, Acc: 0.9845
+
+===== Epoch 12/20 =====
+Train -> Loss: 0.0165 (H:0.03, S:0.00, A:0.00), Acc: 0.9935
+Val   -> Loss: 0.0985, Acc: 0.9832
+
+===== Epoch 13/20 =====
+Train -> Loss: 0.0126 (H:0.02, S:0.00, A:0.00), Acc: 0.9941
+Val   -> Loss: 0.1002, Acc: 0.9832
+
+===== Epoch 14/20 =====
+Train -> Loss: 0.0093 (H:0.01, S:0.00, A:0.00), Acc: 0.9959
+Val   -> Loss: 0.0952, Acc: 0.9858
+
+===== Epoch 15/20 =====
+Train -> Loss: 0.0054 (H:0.01, S:0.00, A:0.00), Acc: 0.9979
+Val   -> Loss: 0.0941, Acc: 0.9852
+
+===== Epoch 16/20 =====
+Train -> Loss: 0.0039 (H:0.00, S:0.00, A:0.00), Acc: 0.9985
+Val   -> Loss: 0.0950, Acc: 0.9852
+
+===== Epoch 17/20 =====
+Train -> Loss: 0.0056 (H:0.01, S:0.00, A:0.00), Acc: 0.9985
+Val   -> Loss: 0.0945, Acc: 0.9852
+
+===== Epoch 18/20 =====
+Train -> Loss: 0.0056 (H:0.01, S:0.00, A:0.00), Acc: 0.9979
+Val   -> Loss: 0.0945, Acc: 0.9852
+
+===== Epoch 19/20 =====
+Train -> Loss: 0.0033 (H:0.00, S:0.00, A:0.00), Acc: 0.9988
+Val   -> Loss: 0.0960, Acc: 0.9845
+
+===== Epoch 20/20 =====
+Train -> Loss: 0.0031 (H:0.00, S:0.00, A:0.00), Acc: 0.9991
+Val   -> Loss: 0.0968, Acc: 0.9852
+
+--- Final Test Results ---
+Total Samples Tested: 1550
+  - Precision: 0.9921
+  - Recall:    0.9913
+  - F1-Score:  0.9917
+
+--- Classification Report ---
+              precision    recall  f1-score   support
+
+        Real       0.98      0.98      0.98       405
+        Fake       0.99      0.99      0.99      1145
+
+    accuracy                           0.99      1550
+   macro avg       0.98      0.98      0.98      1550
+weighted avg       0.99      0.99      0.99      1550
+
+
+--- Confusion Matrix ---
+[[ 396    9]
+ [  10 1135]]

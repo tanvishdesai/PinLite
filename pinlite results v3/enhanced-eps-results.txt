@@ -1,0 +1,130 @@
+✅ Loaded PinPoint module
+Successfully imported components from PinPoint.py
+✅ Loaded Distill module
+✅ [Attention-Variants] Loaded PinPoint module
+✅ [Attention-Variants] Loaded Distill_PinPoint module
+✅ Loaded Attentionvariants module
+============================================================
+PIN-LITE: ATTENTION-BASED ENHANCED EPS ANALYSIS (V2)
+============================================================
+Method: Cross-attention map comparison (architecture-agnostic)
+Dataset: /kaggle/input/datasets/shivamansari/pinlite-models-v2-2002
+Device: cuda
+Samples per model: 500
+
+Downloading: "https://download.pytorch.org/models/resnet18-f37072fd.pth" to /root/.cache/torch/hub/checkpoints/resnet18-f37072fd.pth
+100%|██████████| 44.7M/44.7M [00:00<00:00, 209MB/s]
+Initialized VideoFeatureExtractor with a pretrained ResNet-18 backbone (inplace operations patched for XAI compatibility).
+Initialized AudioFeatureExtractor with a CNN-GRU backbone. (Using LayerNorm instead of BatchNorm)
+PinpointTransformer model initialized.
+Teacher model loaded.
+--- Loading 'test' data from unified metadata ---
+Found 1550 entries for split 'test' in the unified metadata.
+Successfully located and loaded 1550 samples for the 'test' split.
+Downloading: "https://download.pytorch.org/models/mobilenet_v3_small-047dcff4.pth" to /root/.cache/torch/hub/checkpoints/mobilenet_v3_small-047dcff4.pth
+100%|██████████| 9.83M/9.83M [00:00<00:00, 190MB/s]
+Initialized VideoFeatureExtractorLite with a pretrained MobileNetV3-Small backbone.
+Initialized AudioFeatureExtractor with a CNN-GRU backbone. (Using LayerNorm instead of BatchNorm)
+PinpointTransformerLite (Student Model) initialized.
+
+
+  Computing Attention-Based EPS for Distilled (500 samples)...
+                                                                  
+
+  Distilled Attention-Based EPS Results:
+    Spearman: 0.6559 [0.6369, 0.6788]
+    IoU:      0.4947 [0.4762, 0.5113]
+    Cosine:   0.9189 [0.9162, 0.9215]
+    EPS(w1=0.3): 0.5431 [0.5254, 0.5618]
+    EPS(w1=0.5): 0.5753 [0.5570, 0.5939]
+    EPS(w1=0.7): 0.6076 [0.5886, 0.6268]
+    CosineEPS: 0.7068 [0.6966, 0.7165]
+Initialized VideoFeatureExtractorLite with a pretrained MobileNetV3-Small backbone.
+Initialized AudioFeatureExtractor with a CNN-GRU backbone. (Using LayerNorm instead of BatchNorm)
+PinpointTransformerLite (Student Model) initialized.
+
+  Computing Attention-Based EPS for Pruned (500 samples)...
+                                                               
+
+  Pruned Attention-Based EPS Results:
+    Spearman: 0.6505 [0.6302, 0.6698]
+    IoU:      0.4782 [0.4600, 0.4946]
+    Cosine:   0.9008 [0.8987, 0.9030]
+    EPS(w1=0.3): 0.5299 [0.5117, 0.5461]
+    EPS(w1=0.5): 0.5644 [0.5471, 0.5828]
+    EPS(w1=0.7): 0.5988 [0.5800, 0.6172]
+    CosineEPS: 0.6895 [0.6801, 0.6983]
+Initialized VideoFeatureExtractorLite with a pretrained MobileNetV3-Small backbone.
+Initialized AudioFeatureExtractor with a CNN-GRU backbone. (Using LayerNorm instead of BatchNorm)
+PinpointTransformerVariant (linear) initialized.
+
+  Computing Attention-Based EPS for LinearAttn (500 samples)...
+                                                                   
+
+  LinearAttn Attention-Based EPS Results:
+    Spearman: -0.0417 [-0.0516, -0.0307]
+    IoU:      0.0911 [0.0858, 0.0970]
+    Cosine:   0.6643 [0.6575, 0.6710]
+    EPS(w1=0.3): 0.0513 [0.0448, 0.0576]
+    EPS(w1=0.5): 0.0247 [0.0171, 0.0324]
+    EPS(w1=0.7): -0.0019 [-0.0100, 0.0071]
+    CosineEPS: 0.3777 [0.3735, 0.3822]
+Initialized VideoFeatureExtractorLite with a pretrained MobileNetV3-Small backbone.
+Initialized AudioFeatureExtractor with a CNN-GRU backbone. (Using LayerNorm instead of BatchNorm)
+PinpointTransformerVariant (mqa) initialized.
+
+  Computing Attention-Based EPS for MQA (500 samples)...
+                                                            
+
+  MQA Attention-Based EPS Results:
+    Spearman: 0.6517 [0.6326, 0.6707]
+    IoU:      0.4966 [0.4802, 0.5139]
+    Cosine:   0.9124 [0.9097, 0.9150]
+    EPS(w1=0.3): 0.5431 [0.5262, 0.5615]
+    EPS(w1=0.5): 0.5741 [0.5565, 0.5909]
+    EPS(w1=0.7): 0.6052 [0.5875, 0.6228]
+    CosineEPS: 0.7045 [0.6941, 0.7146]
+Initialized VideoFeatureExtractorLite with a pretrained MobileNetV3-Small backbone.
+Initialized AudioFeatureExtractor with a CNN-GRU backbone. (Using LayerNorm instead of BatchNorm)
+PinpointTransformerVariant (lowrank) initialized.
+
+  Computing Attention-Based EPS for LowRank (500 samples)...
+                                                                
+
+  LowRank Attention-Based EPS Results:
+    Spearman: 0.5749 [0.5534, 0.5957]
+    IoU:      0.4739 [0.4553, 0.4932]
+    Cosine:   0.8910 [0.8876, 0.8943]
+    EPS(w1=0.3): 0.5042 [0.4862, 0.5229]
+    EPS(w1=0.5): 0.5244 [0.5038, 0.5432]
+    EPS(w1=0.7): 0.5446 [0.5241, 0.5649]
+    CosineEPS: 0.6825 [0.6709, 0.6932]
+Initialized VideoFeatureExtractorLite with a pretrained MobileNetV3-Small backbone.
+Initialized AudioFeatureExtractor with a CNN-GRU backbone. (Using LayerNorm instead of BatchNorm)
+PinpointTransformerLite (Student Model) initialized.
+
+  Computing Attention-Based EPS for Combined (500 samples)...
+                                                                 
+
+  Combined Attention-Based EPS Results:
+    Spearman: 0.6555 [0.6329, 0.6749]
+    IoU:      0.4929 [0.4759, 0.5124]
+    Cosine:   0.9175 [0.9150, 0.9199]
+    EPS(w1=0.3): 0.5417 [0.5230, 0.5609]
+    EPS(w1=0.5): 0.5742 [0.5534, 0.5936]
+    EPS(w1=0.7): 0.6067 [0.5873, 0.6261]
+    CosineEPS: 0.7052 [0.6952, 0.7153]
+
+
+Results saved to eps_enhanced_results.csv
+
+         Model  Num_Samples  Spearman_Mean  Spearman_CI_Lower  Spearman_CI_Upper  IoU_Mean  IoU_CI_Lower  IoU_CI_Upper  Cosine_Mean  Cosine_CI_Lower  Cosine_CI_Upper  EPS_w0.3  EPS_w0.3_CI_lower  EPS_w0.3_CI_upper  EPS_w0.5  EPS_w0.5_CI_lower  EPS_w0.5_CI_upper  EPS_w0.7  EPS_w0.7_CI_lower  EPS_w0.7_CI_upper  CosineEPS_Mean  CosineEPS_CI_Lower  CosineEPS_CI_Upper
+Base (Teacher)          500       1.000000           1.000000           1.000000  1.000000      1.000000      1.000000     1.000000         1.000000         1.000000  1.000000           1.000000           1.000000  1.000000           1.000000           1.000000  1.000000           1.000000           1.000000        1.000000            1.000000            1.000000
+     Distilled          500       0.655921           0.636943           0.678770  0.494690      0.476234      0.511263     0.918935         0.916182         0.921477  0.543059           0.525442           0.561769  0.575305           0.557010           0.593868  0.607552           0.588589           0.626839        0.706812            0.696635            0.716465
+        Pruned          500       0.650525           0.630162           0.669847  0.478207      0.459977      0.494561     0.900801         0.898708         0.902993  0.529902           0.511743           0.546091  0.564366           0.547132           0.582762  0.598830           0.580010           0.617212        0.689504            0.680134            0.698274
+    LinearAttn          500      -0.041690          -0.051588          -0.030740  0.091098      0.085824      0.097008     0.664335         0.657467         0.671004  0.051262           0.044837           0.057604  0.024704           0.017108           0.032392 -0.001854          -0.009969           0.007088        0.377717            0.373500            0.382162
+           MQA          500       0.651706           0.632599           0.670655  0.496560      0.480186      0.513934     0.912429         0.909680         0.915022  0.543104           0.526161           0.561510  0.574133           0.556514           0.590927  0.605163           0.587492           0.622845        0.704495            0.694093            0.714605
+       LowRank          500       0.574919           0.553428           0.595709  0.473939      0.455294      0.493165     0.891013         0.887608         0.894276  0.504233           0.486170           0.522862  0.524429           0.503810           0.543247  0.544625           0.524130           0.564893        0.682476            0.670942            0.693180
+      Combined          500       0.655523           0.632947           0.674912  0.492932      0.475892      0.512450     0.917501         0.914961         0.919936  0.541709           0.522966           0.560921  0.574227           0.553390           0.593618  0.606745           0.587286           0.626067        0.705216            0.695217            0.715348
+
+--- Attention-Based EPS Analysis Complete ---

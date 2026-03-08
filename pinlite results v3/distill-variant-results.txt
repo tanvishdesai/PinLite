@@ -1,0 +1,115 @@
+===== Epoch 1/20 =====
+Distilling E1:   0%|                                    | 0/425 [00:00<?, ?it/s]/kaggle/working/distillattenvariants.py:116: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast():
+Train -> Loss: 0.2892 (H:0.57, S:0.00, A:0.00), Acc: 0.7259
+Evaluating:   0%|                                       | 0/194 [00:00<?, ?it/s]/kaggle/working/PinPoint.py:2205: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast():
+Val   -> Loss: 0.5580, Acc: 0.7290
+  -> New best model saved: best_pinpoint_LOWRANK_model.pth
+
+===== Epoch 2/20 =====
+Train -> Loss: 0.2590 (H:0.51, S:0.00, A:0.00), Acc: 0.7691
+Val   -> Loss: 0.4735, Acc: 0.7819
+  -> New best model saved: best_pinpoint_LOWRANK_model.pth
+
+===== Epoch 3/20 =====
+Train -> Loss: 0.2343 (H:0.46, S:0.00, A:0.00), Acc: 0.8012
+Val   -> Loss: 0.5853, Acc: 0.7284
+
+===== Epoch 4/20 =====
+Train -> Loss: 0.2181 (H:0.43, S:0.00, A:0.00), Acc: 0.8232
+Val   -> Loss: 0.4873, Acc: 0.7935
+
+===== Epoch 5/20 =====
+Train -> Loss: 0.1862 (H:0.37, S:0.00, A:0.00), Acc: 0.8491
+Val   -> Loss: 0.3915, Acc: 0.8439
+  -> New best model saved: best_pinpoint_LOWRANK_model.pth
+
+===== Epoch 6/20 =====
+Train -> Loss: 0.1731 (H:0.34, S:0.00, A:0.00), Acc: 0.8594
+Val   -> Loss: 0.3539, Acc: 0.8548
+  -> New best model saved: best_pinpoint_LOWRANK_model.pth
+
+===== Epoch 7/20 =====
+Train -> Loss: 0.1541 (H:0.30, S:0.00, A:0.00), Acc: 0.8768
+Val   -> Loss: 0.3772, Acc: 0.8645
+
+===== Epoch 8/20 =====
+Train -> Loss: 0.1478 (H:0.29, S:0.00, A:0.00), Acc: 0.8871
+Val   -> Loss: 0.5206, Acc: 0.8535
+
+===== Epoch 9/20 =====
+Train -> Loss: 0.1322 (H:0.26, S:0.00, A:0.00), Acc: 0.8941
+Val   -> Loss: 0.3148, Acc: 0.8884
+  -> New best model saved: best_pinpoint_LOWRANK_model.pth
+
+===== Epoch 10/20 =====
+Train -> Loss: 0.0892 (H:0.17, S:0.00, A:0.00), Acc: 0.9371
+Val   -> Loss: 0.2119, Acc: 0.9387
+  -> New best model saved: best_pinpoint_LOWRANK_model.pth
+
+===== Epoch 11/20 =====
+Train -> Loss: 0.0550 (H:0.10, S:0.00, A:0.00), Acc: 0.9676
+Val   -> Loss: 0.1710, Acc: 0.9548
+  -> New best model saved: best_pinpoint_LOWRANK_model.pth
+
+===== Epoch 12/20 =====
+Train -> Loss: 0.0402 (H:0.08, S:0.00, A:0.00), Acc: 0.9782
+Val   -> Loss: 0.0845, Acc: 0.9787
+  -> New best model saved: best_pinpoint_LOWRANK_model.pth
+
+===== Epoch 13/20 =====
+Train -> Loss: 0.0355 (H:0.07, S:0.00, A:0.00), Acc: 0.9809
+Val   -> Loss: 0.0898, Acc: 0.9781
+
+===== Epoch 14/20 =====
+Train -> Loss: 0.0254 (H:0.05, S:0.00, A:0.00), Acc: 0.9862
+Val   -> Loss: 0.2321, Acc: 0.9529
+
+===== Epoch 15/20 =====
+Train -> Loss: 0.0311 (H:0.06, S:0.00, A:0.00), Acc: 0.9841
+Val   -> Loss: 0.0916, Acc: 0.9800
+
+===== Epoch 16/20 =====
+Train -> Loss: 0.0206 (H:0.04, S:0.00, A:0.00), Acc: 0.9912
+Val   -> Loss: 0.1000, Acc: 0.9787
+
+===== Epoch 17/20 =====
+Train -> Loss: 0.0263 (H:0.05, S:0.00, A:0.00), Acc: 0.9888
+Val   -> Loss: 0.1073, Acc: 0.9768
+
+===== Epoch 18/20 =====
+Train -> Loss: 0.0187 (H:0.03, S:0.00, A:0.00), Acc: 0.9924
+Val   -> Loss: 0.0965, Acc: 0.9813
+
+===== Epoch 19/20 =====
+Train -> Loss: 0.0162 (H:0.03, S:0.00, A:0.00), Acc: 0.9926
+Val   -> Loss: 0.1005, Acc: 0.9800
+
+===== Epoch 20/20 =====
+Train -> Loss: 0.0164 (H:0.03, S:0.00, A:0.00), Acc: 0.9921
+Val   -> Loss: 0.0985, Acc: 0.9813
+
+--- Training complete in 240.85 minutes ---
+
+--- [5/5] Testing best LOWRANK model ---
+--- Final Test Results ---
+Total Samples Tested: 1550
+  - Precision: 0.9782
+  - Recall:    0.9808
+  - F1-Score:  0.9795
+
+--- Classification Report ---
+              precision    recall  f1-score   support
+
+        Real       0.95      0.94      0.94       405
+        Fake       0.98      0.98      0.98      1145
+
+    accuracy                           0.97      1550
+   macro avg       0.96      0.96      0.96      1550
+weighted avg       0.97      0.97      0.97      1550
+
+
+--- Confusion Matrix ---
+[[ 380   25]
+ [  22 1123]]

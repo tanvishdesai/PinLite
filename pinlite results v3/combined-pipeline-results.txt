@@ -1,0 +1,117 @@
+✅ Loaded PinPoint module
+Successfully imported components from PinPoint.py
+✅ Loaded Distill_PinPoint module
+============================================================
+PIN-LITE: COMBINED COMPRESSION PIPELINE
+Distill → Prune → Quantize
+============================================================
+--- Loading 'train' data from unified metadata ---
+Found 3400 entries for split 'train' in the unified metadata.
+Successfully located and loaded 3400 samples for the 'train' split.
+### Training mode: Activating AGGRESSIVE anti-shortcut augmentations. ###
+--- Loading 'test' data from unified metadata ---
+Found 1550 entries for split 'test' in the unified metadata.
+Successfully located and loaded 1550 samples for the 'test' split.
+Downloading: "https://download.pytorch.org/models/resnet18-f37072fd.pth" to /root/.cache/torch/hub/checkpoints/resnet18-f37072fd.pth
+100%|██████████| 44.7M/44.7M [00:00<00:00, 168MB/s]
+Initialized VideoFeatureExtractor with a pretrained ResNet-18 backbone (inplace operations patched for XAI compatibility).
+Initialized AudioFeatureExtractor with a CNN-GRU backbone. (Using LayerNorm instead of BatchNorm)
+PinpointTransformer model initialized.
+
+============================================================
+STEP 1: Loading Distilled Student Model
+============================================================
+Downloading: "https://download.pytorch.org/models/mobilenet_v3_small-047dcff4.pth" to /root/.cache/torch/hub/checkpoints/mobilenet_v3_small-047dcff4.pth
+100%|██████████| 9.83M/9.83M [00:00<00:00, 117MB/s]
+Initialized VideoFeatureExtractorLite with a pretrained MobileNetV3-Small backbone.
+Initialized AudioFeatureExtractor with a CNN-GRU backbone. (Using LayerNorm instead of BatchNorm)
+PinpointTransformerLite (Student Model) initialized.
+Loaded student model: 1,694,508 parameters
+
+--- Baseline (Distilled Only) ---
+
+--- Evaluating Distilled-Baseline ---
+Testing Distilled-Baseline: 100%|██████████| 194/194 [01:23<00:00,  2.33it/s]
+  Accuracy:  0.9865
+  Precision: 0.9887
+  Recall:    0.9930
+  F1-Score:  0.9908
+  AUC:       0.9805
+  Latency:   47.62 ms/sample
+
+============================================================
+STEP 2: Iterative Structured Pruning
+============================================================
+
+--- Pruning Iteration 1/3 ---
+  Global sparsity: 20.0%
+  Finetuning for 3 epochs to recover accuracy...
+                                                                
+  Epoch 1: Loss=0.0064, Acc=0.9971
+                                                                
+  Epoch 2: Loss=0.0035, Acc=0.9988
+                                                                
+  Epoch 3: Loss=0.0052, Acc=0.9979
+
+--- Pruning Iteration 2/3 ---
+  Global sparsity: 20.0%
+  Finetuning for 3 epochs to recover accuracy...
+                                                                
+  Epoch 1: Loss=0.0029, Acc=0.9985
+                                                                
+  Epoch 2: Loss=0.0023, Acc=0.9985
+                                                                
+  Epoch 3: Loss=0.0029, Acc=0.9988
+
+--- Pruning Iteration 3/3 ---
+  Global sparsity: 20.0%
+  Finetuning for 3 epochs to recover accuracy...
+                                                                
+  Epoch 1: Loss=0.0026, Acc=0.9991
+                                                                
+  Epoch 2: Loss=0.0038, Acc=0.9979
+                                                                
+  Epoch 3: Loss=0.0040, Acc=0.9985
+
+Final global sparsity: 20.0%
+Pruning complete.
+
+--- After Pruning ---
+
+--- Evaluating Distilled+Pruned ---
+Testing Distilled+Pruned: 100%|██████████| 194/194 [01:14<00:00,  2.62it/s]
+  Accuracy:  0.9865
+  Precision: 0.9938
+  Recall:    0.9878
+  F1-Score:  0.9908
+  AUC:       0.9852
+  Latency:   42.44 ms/sample
+Pruned model size: 6.63 MB
+
+============================================================
+STEP 3: Post-Training Dynamic Quantization (INT8)
+============================================================
+Dynamic quantization applied to Linear and GRU layers.
+
+--- Final Combined Model (Distill+Prune+Quantize) ---
+
+--- Evaluating Combined ---
+Testing Combined: 100%|██████████| 194/194 [04:51<00:00,  1.50s/it]
+  Accuracy:  0.9865
+  Precision: 0.9938
+  Recall:    0.9878
+  F1-Score:  0.9908
+  AUC:       0.9852
+  Latency:   185.60 ms/sample
+
+============================================================
+PIPELINE RESULTS SUMMARY
+============================================================
+Stage                       Accuracy    Latency (ms)    Size (MB)
+-----------------------------------------------------------------
+Distilled (input)             0.9865           47.62         6.62
++ Pruned                      0.9865           42.44         6.63
++ Quantized (final)           0.9865          185.60         5.29
+
+Final model saved to: best_pinpoint_COMBINED_model.pth
+--- Combined Pipeline Complete ---
