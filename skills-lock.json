@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "research-paper-writing": {
+      "source": "tanvishdesai/Homer",
+      "sourceType": "github",
+      "skillPath": "skills/research-paper-writing/SKILL.md",
+      "computedHash": "0573dc0ff864ab63b48e08dabaf160c7617352480f0a13a5043fec10e6f00b43"
+    }
+  }
+}

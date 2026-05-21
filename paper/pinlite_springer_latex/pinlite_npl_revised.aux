@@ -1,0 +1,145 @@
+\relax 
+\bibstyle{sn-basic}
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\Newlabel{1}{1}
+\Newlabel{2}{2}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{2}{section.2}\protected@file@percent }
+\newlabel{sec:introduction}{{1}{2}{Introduction}{section.2}{}}
+\citation{wang2022m2tr}
+\citation{shahzad2023avlipsync}
+\citation{du2025cad}
+\citation{tariq2025dfp2e}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Related Work}{3}{section.8}\protected@file@percent }
+\newlabel{sec:related}{{2}{3}{Related Work}{section.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Multimodal deepfake detection}{3}{subsection.9}\protected@file@percent }
+\newlabel{subsec:multimodal}{{2.1}{3}{Multimodal deepfake detection}{subsection.9}{}}
+\citation{hinton2015distilling}
+\citation{jacob2018quantization}
+\citation{howard2019mobilenetv3}
+\citation{karathanasis2025compression}
+\citation{alharbi2021xdistillation}
+\citation{parchami2024e2kd}
+\citation{malik2025pruning}
+\citation{katharopoulos2020linear}
+\citation{shazeer2019mqa}
+\citation{he2016resnet}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Compression for efficient deepfake detection}{4}{subsection.10}\protected@file@percent }
+\newlabel{subsec:compression}{{2.2}{4}{Compression for efficient deepfake detection}{subsection.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Explanation-preserving distillation and attention efficiency}{4}{subsection.11}\protected@file@percent }
+\newlabel{subsec:explanation}{{2.3}{4}{Explanation-preserving distillation and attention efficiency}{subsection.11}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Structural comparison of PIN-Lite with representative deepfake detection, compression and explanation-preserving methods.}}{5}{table.13}\protected@file@percent }
+\newlabel{tab:method-comparison}{{1}{5}{Structural comparison of PIN-Lite with representative deepfake detection, compression and explanation-preserving methods}{table.13}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Overview of the PIN-Lite compression and evaluation framework. The teacher is distilled into a MobileNetV3-based student using hard-label, soft-logit and attention-map supervision. Pruning, quantization and efficient attention variants are then evaluated with both task metrics and EPS.}}{5}{figure.16}\protected@file@percent }
+\newlabel{fig:framework}{{1}{5}{Overview of the PIN-Lite compression and evaluation framework. The teacher is distilled into a MobileNetV3-based student using hard-label, soft-logit and attention-map supervision. Pruning, quantization and efficient attention variants are then evaluated with both task metrics and EPS}{figure.16}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Proposed Method}{5}{section.14}\protected@file@percent }
+\newlabel{sec:method}{{3}{5}{Proposed Method}{section.14}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Teacher model}{5}{subsection.17}\protected@file@percent }
+\newlabel{subsec:teacher}{{3.1}{5}{Teacher model}{subsection.17}{}}
+\newlabel{eq:video}{{1}{6}{Teacher model}{equation.18}{}}
+\newlabel{eq:audio}{{2}{6}{Teacher model}{equation.19}{}}
+\newlabel{eq:cross-attention}{{3}{6}{Teacher model}{equation.20}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}PIN-Lite student}{6}{subsection.21}\protected@file@percent }
+\newlabel{subsec:student}{{3.2}{6}{PIN-Lite student}{subsection.21}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Attention-aware knowledge distillation}{6}{subsection.24}\protected@file@percent }
+\newlabel{subsec:distillation}{{3.3}{6}{Attention-aware knowledge distillation}{subsection.24}{}}
+\newlabel{eq:student-loss}{{4}{6}{Attention-aware knowledge distillation}{equation.25}{}}
+\newlabel{eq:hard}{{5}{6}{Attention-aware knowledge distillation}{equation.26}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Architectural comparison between the full teacher and the PIN-Lite student. The student replaces the ResNet-18 visual pathway with MobileNetV3-Small, reduces the embedding dimension and attention heads, and preserves the cross-attention interface needed for EPS computation.}}{7}{figure.23}\protected@file@percent }
+\newlabel{fig:architecture-comparison}{{2}{7}{Architectural comparison between the full teacher and the PIN-Lite student. The student replaces the ResNet-18 visual pathway with MobileNetV3-Small, reduces the embedding dimension and attention heads, and preserves the cross-attention interface needed for EPS computation}{figure.23}{}}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Attention-aware PIN-Lite distillation}}{7}{algorithm.29}\protected@file@percent }
+\newlabel{alg:distillation}{{1}{7}{Attention-aware knowledge distillation}{algorithm.29}{}}
+\newlabel{eq:soft}{{6}{7}{Attention-aware knowledge distillation}{equation.27}{}}
+\newlabel{eq:attention-loss}{{7}{7}{Attention-aware knowledge distillation}{equation.28}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces EPS computation pipeline. For each input, teacher and student cross-attention maps are extracted, flattened, ranked and thresholded into top-attended masks. EPS combines Spearman rank correlation and top-region IoU, with bootstrap confidence intervals over evaluation samples.}}{8}{figure.33}\protected@file@percent }
+\newlabel{fig:eps-pipeline}{{3}{8}{EPS computation pipeline. For each input, teacher and student cross-attention maps are extracted, flattened, ranked and thresholded into top-attended masks. EPS combines Spearman rank correlation and top-region IoU, with bootstrap confidence intervals over evaluation samples}{figure.33}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Pruning and quantization}{8}{subsection.30}\protected@file@percent }
+\newlabel{subsec:compression-pipeline}{{3.4}{8}{Pruning and quantization}{subsection.30}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Explainability Preservation Score}{8}{subsection.31}\protected@file@percent }
+\newlabel{subsec:eps}{{3.5}{8}{Explainability Preservation Score}{subsection.31}{}}
+\newlabel{eq:eps}{{8}{8}{Explainability Preservation Score}{equation.34}{}}
+\citation{cai2022lavdf}
+\citation{karathanasis2025compression}
+\citation{chen2021defakehop}
+\citation{balafrej2024lightweight}
+\citation{cheng2024multiscale}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Comparison with representative parameter-reduction-oriented deepfake detectors. Values are not directly comparable as a leaderboard because datasets and modalities differ; the table positions PIN-Lite relative to compact detector designs.}}{9}{table.38}\protected@file@percent }
+\newlabel{tab:baseline-comparison}{{2}{9}{Comparison with representative parameter-reduction-oriented deepfake detectors. Values are not directly comparable as a leaderboard because datasets and modalities differ; the table positions PIN-Lite relative to compact detector designs}{table.38}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Experiments}{9}{section.35}\protected@file@percent }
+\newlabel{sec:experiments}{{4}{9}{Experiments}{section.35}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Dataset and setup}{9}{subsection.36}\protected@file@percent }
+\newlabel{subsec:setup}{{4.1}{9}{Dataset and setup}{subsection.36}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Main results on LAV-DF}{9}{subsection.39}\protected@file@percent }
+\newlabel{subsec:main-results}{{4.2}{9}{Main results on LAV-DF}{subsection.39}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Comprehensive LAV-DF benchmark for PIN-Lite variants.}}{10}{table.41}\protected@file@percent }
+\newlabel{tab:main-results}{{3}{10}{Comprehensive LAV-DF benchmark for PIN-Lite variants}{table.41}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Pareto analysis over accuracy, latency and EPS. MQA lies on the desirable frontier because it improves latency and accuracy while preserving attention fidelity. Linear Attention is dominated because its EPS collapses.}}{10}{figure.44}\protected@file@percent }
+\newlabel{fig:pareto}{{4}{10}{Pareto analysis over accuracy, latency and EPS. MQA lies on the desirable frontier because it improves latency and accuracy while preserving attention fidelity. Linear Attention is dominated because its EPS collapses}{figure.44}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Attention variant analysis}{10}{subsection.42}\protected@file@percent }
+\newlabel{subsec:attention-results}{{4.3}{10}{Attention variant analysis}{subsection.42}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Attention-map fidelity components with 95\% bootstrap confidence intervals on a 500-sample subset.}}{11}{table.47}\protected@file@percent }
+\newlabel{tab:eps}{{4}{11}{Attention-map fidelity components with 95\% bootstrap confidence intervals on a 500-sample subset}{table.47}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Component-level EPS analysis across model variants. Spearman rank correlation and EPS separate explanation-preserving variants from Linear Attention, while cosine similarity alone is less discriminative.}}{11}{figure.49}\protected@file@percent }
+\newlabel{fig:eps-components}{{5}{11}{Component-level EPS analysis across model variants. Spearman rank correlation and EPS separate explanation-preserving variants from Linear Attention, while cosine similarity alone is less discriminative}{figure.49}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Explainability preservation}{11}{subsection.45}\protected@file@percent }
+\newlabel{subsec:eps-results}{{4.4}{11}{Explainability preservation}{subsection.45}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Effect of distillation loss weights with $T=2.0$ and two student layers.}}{12}{table.52}\protected@file@percent }
+\newlabel{tab:loss-ablation}{{5}{12}{Effect of distillation loss weights with $T=2.0$ and two student layers}{table.52}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Temperature sensitivity for student distillation.}}{12}{table.54}\protected@file@percent }
+\newlabel{tab:temperature}{{6}{12}{Temperature sensitivity for student distillation}{table.54}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Student depth ablation.}}{12}{table.56}\protected@file@percent }
+\newlabel{tab:depth}{{7}{12}{Student depth ablation}{table.56}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Ablation studies}{12}{subsection.50}\protected@file@percent }
+\newlabel{subsec:ablation}{{4.5}{12}{Ablation studies}{subsection.50}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces Requested pruning rate versus observed sparsity and task performance.}}{13}{table.58}\protected@file@percent }
+\newlabel{tab:pruning-rate}{{8}{13}{Requested pruning rate versus observed sparsity and task performance}{table.58}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces Per-layer category sparsity after pruning.}}{13}{table.60}\protected@file@percent }
+\newlabel{tab:sparsity}{{9}{13}{Per-layer category sparsity after pruning}{table.60}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces EPS sensitivity to metric weights and top-attended threshold.}}{14}{table.62}\protected@file@percent }
+\newlabel{tab:eps-sensitivity}{{10}{14}{EPS sensitivity to metric weights and top-attended threshold}{table.62}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces Progressive PIN-Lite compression pipeline.}}{14}{table.65}\protected@file@percent }
+\newlabel{tab:progressive}{{11}{14}{Progressive PIN-Lite compression pipeline}{table.65}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Progressive compression pipeline}{14}{subsection.63}\protected@file@percent }
+\newlabel{subsec:progressive}{{4.6}{14}{Progressive compression pipeline}{subsection.63}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.7}Cross-dataset behavioral fidelity}{14}{subsection.66}\protected@file@percent }
+\newlabel{subsec:cross-dataset}{{4.7}{14}{Cross-dataset behavioral fidelity}{subsection.66}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Zero-shot FakeAVCeleb evaluation.}}{15}{table.68}\protected@file@percent }
+\newlabel{tab:cross-dataset}{{12}{15}{Zero-shot FakeAVCeleb evaluation}{table.68}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{15}{section.69}\protected@file@percent }
+\newlabel{sec:discussion}{{5}{15}{Discussion}{section.69}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}EPS as a design metric}{15}{subsection.70}\protected@file@percent }
+\newlabel{subsec:accuracy-risk}{{5.1}{15}{EPS as a design metric}{subsection.70}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Why MQA works better than Linear Attention}{15}{subsection.71}\protected@file@percent }
+\newlabel{subsec:mqa}{{5.2}{15}{Why MQA works better than Linear Attention}{subsection.71}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Role of attention transfer}{16}{subsection.72}\protected@file@percent }
+\newlabel{subsec:attention-transfer}{{5.3}{16}{Role of attention transfer}{subsection.72}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Deployment implications}{16}{subsection.73}\protected@file@percent }
+\newlabel{subsec:deployment}{{5.4}{16}{Deployment implications}{subsection.73}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Limitations}{16}{subsection.74}\protected@file@percent }
+\newlabel{subsec:limitations}{{5.5}{16}{Limitations}{subsection.74}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Conclusion}{17}{section.75}\protected@file@percent }
+\newlabel{sec:conclusion}{{6}{17}{Conclusion}{section.75}{}}
+\bibcite{wang2022m2tr}{{1}{}{{}}{{}}}
+\bibcite{shahzad2023avlipsync}{{2}{}{{}}{{}}}
+\bibcite{du2025cad}{{3}{}{{}}{{}}}
+\bibcite{tariq2025dfp2e}{{4}{}{{}}{{}}}
+\bibcite{hinton2015distilling}{{5}{}{{}}{{}}}
+\bibcite{jacob2018quantization}{{6}{}{{}}{{}}}
+\bibcite{howard2019mobilenetv3}{{7}{}{{}}{{}}}
+\bibcite{karathanasis2025compression}{{8}{}{{}}{{}}}
+\bibcite{chen2021defakehop}{{9}{}{{}}{{}}}
+\bibcite{balafrej2024lightweight}{{10}{}{{}}{{}}}
+\bibcite{cheng2024multiscale}{{11}{}{{}}{{}}}
+\bibcite{alharbi2021xdistillation}{{12}{}{{}}{{}}}
+\bibcite{parchami2024e2kd}{{13}{}{{}}{{}}}
+\bibcite{malik2025pruning}{{14}{}{{}}{{}}}
+\bibcite{katharopoulos2020linear}{{15}{}{{}}{{}}}
+\bibcite{shazeer2019mqa}{{16}{}{{}}{{}}}
+\bibcite{vaswani2017attention}{{17}{}{{}}{{}}}
+\bibcite{cai2022lavdf}{{18}{}{{}}{{}}}
+\bibcite{he2016resnet}{{19}{}{{}}{{}}}
+\bibcite{chakraborty2024tampering}{{20}{}{{}}{{}}}
+\bibcite{pasen2024merging}{{21}{}{{}}{{}}}
+\providecommand\NAT@force@numbers{}\NAT@force@numbers
+\gdef \@abspage@last{20}

@@ -329,14 +329,15 @@ def ablation_pruning_rate(teacher, train_loader, dev_loader, test_loader, device
         model.to(device)
         
         if rate > 0:
-            # Apply pruning
+            # Apply pruning (local layer-wise to ensure correct sparsity)
             prunable = []
             for name, module in model.named_modules():
                 if isinstance(module, (nn.Linear, nn.Conv2d)):
                     prunable.append((module, 'weight'))
             
             if prunable:
-                prune.global_unstructured(prunable, pruning_method=prune.L1Unstructured, amount=rate)
+                for module, name in prunable:
+                    prune.l1_unstructured(module, name, amount=rate)
                 
                 # Make permanent
                 for module, name in prunable:

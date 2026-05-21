@@ -1,0 +1,44 @@
+{
+  "current_phase": "P0",
+  "active_hypothesis": "Full PinPoint can be quantized end-to-end, including gated attention, while meeting accuracy, EPS, and CPU speed constraints.",
+  "best_exp_id": "",
+  "best_metrics": {},
+  "failure_mode": "NOT_STARTED",
+  "run_queue_top3": [
+    {
+      "rank": 1,
+      "label": "nearest-to-pass",
+      "rationale": "Build reproducible FP32 teacher baseline for all gates.",
+      "command": "python research/gaq_experiment.py --exp_id GAQ-P0-001 --phase P0 --seed 11 --backend fp32_cpu --attention_quant_policy fp32_reference --qat_epochs 0 --calibration_profile none --eval_profile cpu_edge_v1 --status planned"
+    },
+    {
+      "rank": 2,
+      "label": "highest-EPS-recovery-potential",
+      "rationale": "Validate math-equivalent explicit Q/K/V refactor before quantization.",
+      "command": "python research/gaq_experiment.py --exp_id GAQ-P1-001 --phase P1 --seed 11 --backend fp32_cpu --attention_quant_policy explicit_qkv_refactor --qat_epochs 0 --calibration_profile none --eval_profile parity_v1 --run_parity --status completed"
+    },
+    {
+      "rank": 3,
+      "label": "highest-CPU-speedup-potential",
+      "rationale": "Start first hybrid PTQ attempt with softmax/LN retained in high precision.",
+      "command": "python research/gaq_experiment.py --exp_id GAQ-P2-001 --phase P2 --seed 11 --backend fbgemm --attention_quant_policy hybrid_int8_qkv_out_gate_ffn_softmaxln_fp32 --qat_epochs 0 --calibration_profile lavdf_200 --eval_profile cpu_edge_v1 --status planned"
+    }
+  ],
+  "blocked_items": [],
+  "decision_log": [
+    {
+      "timestamp": "2026-04-08T00:00:00Z",
+      "event": "initialized",
+      "detail": "Research state initialized with Cycle 1 queue."
+    }
+  ],
+  "baseline_metrics": {},
+  "phase_gates": {
+    "P0": false,
+    "P1": false,
+    "P2": false,
+    "P3": false,
+    "P4": false,
+    "P5": false
+  }
+}
