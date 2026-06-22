@@ -2,6 +2,13 @@
 
 This folder is the autonomous control plane for the Quantized Gated-Attention main track.
 
+> **The runnable GAQ implementation now lives at the repo root** (`gaq_core.py`,
+> `gaq_p0_baseline.py`, `gaq_p1_parity.py`, `gaq_ptq.py`, `gaq_qat.py`,
+> `gaq_onnx_latency.py`, `gaq_crossdataset.py`, `gaq_build_table.py`). See
+> `../RUNBOOK.md`. This folder remains the experiment **logger/registry**
+> (`gaq_experiment.py`) and the module-level parity utility
+> (`gaq_attention_refactor.py`).
+
 ## Files
 - `quant_gated_attention_main.md`: human-readable progress and next-run guidance.
 - `experiment_registry.csv`: machine-readable registry (single source of run history).

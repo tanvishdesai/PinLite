@@ -1,4 +1,15 @@
 %%writefile Prune_PinPoint.py
+# =============================================================================
+# DEPRECATED — not load-bearing in PIN-Lite v2.
+#
+# This script uses UNSTRUCTURED pruning (torch.nn.utils.prune), which zeroes
+# weights without physically removing them. Result: NO size/param reduction
+# (Distilled and Pruned are identical at 6.62 MB / 1.69 M params), and EPS
+# actually dropped. Pruning is therefore removed from the headline; compression
+# now comes from KD + GAQ (see README.md / RUNBOOK.md). For a real pruning
+# result, do STRUCTURED channel pruning of the MobileNetV3 backbone instead.
+# Kept only for reproducibility of the original (failed) experiment.
+# =============================================================================
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
