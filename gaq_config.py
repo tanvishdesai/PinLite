@@ -30,29 +30,38 @@ import os
 import sys
 from pathlib import Path
 
+# Make stdout/stderr UTF-8 so the ✓/✅/— glyphs in our reports don't crash on a
+# Windows cp1252 console. No-op on Kaggle (already UTF-8) and on older Pythons.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
 # =================================================================================
 # 1. EDIT THESE PATHS FOR YOUR ENVIRONMENT
 # =================================================================================
 
 # --- Model checkpoints --------------------------------------------------------
 # Teacher (full PinPoint, FP32) checkpoint.
-TEACHER_CKPT = "/kaggle/input/pinlite-all-models-v2-011225/best_pinpoint_model_antisocial.pth"
+TEACHER_CKPT = "/kaggle/input/datasets/shivamansari/pinlite-models-v2-2002/best_pinpoint_model_antisocial.pth"
 # Distilled student (PinpointTransformerLite, FP32) checkpoint. This is the model
 # we quantize with GAQ.
-STUDENT_CKPT = "/kaggle/input/pinlite-all-models-v2-011225/best_pinpoint_LITE_model.pth"
+STUDENT_CKPT = "/kaggle/input/datasets/shivamansari/pinlite-models-v2-2002/best_pinpoint_LITE_model.pth"
 
 # --- In-domain data (LAV-DF) --------------------------------------------------
 # These override PinPoint.Config.DATA_DIRECTORY / METADATA_PATH at runtime so you
 # don't have to edit PinPoint-main.py.
-LAVDF_DATA_DIRECTORY = "/kaggle/input/new-model-unified-pre-processing/preprocessed_data"
-LAVDF_METADATA_PATH = "/kaggle/input/new-model-unified-pre-processing/preprocessed_data/unified_metadata.json"
+LAVDF_DATA_DIRECTORY = "/kaggle/input/datasets/shivamansari/new-model-unified-pre-processing/preprocessed_data"
+LAVDF_METADATA_PATH = "/kaggle/input/datasets/shivamansari/new-model-unified-pre-processing/preprocessed_data/unified_metadata.json"
 
 # --- Cross-dataset data (FakeAVCeleb) -----------------------------------------
-FAVC_DATA_DIRECTORY = "/kaggle/input/fav-pre-process/preprocessed_data"
-FAVC_METADATA_PATH = "/kaggle/input/fav-pre-process/preprocessed_data/preprocessed_metadata_test_only_20250908_142055.json"
+FAVC_DATA_DIRECTORY = "/kaggle/input/notebooks/bernetkinil/fav-pre-process/preprocessed_data"
+FAVC_METADATA_PATH = "/kaggle/input/notebooks/bernetkinil/fav-pre-process/preprocessed_data/preprocessed_metadata_test_only_20250908_142055.json"
 
 # --- Output directory ---------------------------------------------------------
 OUTPUT_DIR = "/kaggle/working"
+
 
 # =================================================================================
 # 2. EXPERIMENT KNOBS (sensible defaults; usually no need to edit)
@@ -131,6 +140,13 @@ def load_pinpoint():
 
 def load_distill():
     """Return the student module (Distill) however it is available."""
+    # Both `Distill.py` (Kaggle) and `Distill-student.py` (repo) do
+    # `from PinPoint import ...` at module level, so PinPoint must be registered
+    # in sys.modules BEFORE we import/exec the student — otherwise the import
+    # fails with "Make sure ... is in the same directory as PinPoint.py". Scripts
+    # that load the teacher first happened to work; this makes it order-independent.
+    if "PinPoint" not in sys.modules:
+        load_pinpoint()
     for name in ("Distill", "Distill_PinPoint"):
         try:
             return importlib.import_module(name)
