@@ -177,27 +177,45 @@ the canonical value above.
 | EPS weighting | w = 0.7 | **w1 = 0.5** |
 | Bootstrap 95% CIs (draft Table 2) | — | **not computed** in canonical gen; omit or re-run |
 
-**Whole rows / studies to DROP (not in the canonical generation):**
+**IMPORTANT — "drop" below means "do not reuse the OLD-GENERATION NUMBER," not "this study
+is worthless."** Only two items should truly vanish from the paper. The rest are *valuable
+supporting studies* that must be **demoted (no longer headline) and re-run** under the
+canonical protocol — their old numbers collide, but the experiments still earn their place,
+especially in a journal version.
+
+*Bucket A — DELETE entirely (broken or dishonest, not an informative ablation):*
 
 - **Pruned** row (6.62 MB, identical to Distilled) — broken unstructured pruning; produced
-  no size/param change. Cut entirely (one-line limitation at most).
-- **FP16** row (3.31 MB) — not re-measured in the GAQ generation. Drop, or re-run if a
-  GPU/FP16 deployment row is wanted; do not import the old number.
-- **Combined (PIN-Lite)** row (5.29 MB, 171.29 ms, acc 0.9822) — the misleading INT8-CPU
-  latency claim. Drop. The honest latency story is Table 3 (~1.0×).
-- **Attention-variant rows** — MQA (0.9800 / EPS 0.6055), LowRank (0.9625 / 0.5719),
-  Linear-Attn (0.6082 / 0.0333). Old generation, orthogonal to GAQ, and the Linear-Attn
-  "EPS collapse" is confounded by an accuracy collapse. If you keep an attention-variant
-  study at all, it must be **re-run** under the canonical protocol; otherwise drop it.
-- **Ablation tables** (loss weights / temperature / depth, draft Table 3) — old-generation
-  KD ablations. They are *context*, not GAQ results. Either re-run, or keep **only** if you
-  state explicitly they are from the distillation study and carry no EPS/GAQ numbers. Never
-  place them beside the canonical EPS numbers as if from one run.
+  no size/param change. A null operation presented as a method; cut entirely (one-line
+  limitation at most).
+- **Combined (PIN-Lite)** latency claim (171.29 ms INT8-CPU) — the misleading
+  "slower-than-teacher" number. Cut. The honest latency story is Table 3 (~1.0×).
 
-**Not measured in the canonical generation (so absent here by design, not by oversight):**
+*Bucket B — KEEP as secondary evidence, but RE-RUN (old number can't be reused):*
+
+- **FP16** row (old: 3.31 MB) — a legitimate GPU/FP16 deployment path. Re-run under the
+  canonical protocol if you want a GPU-edge row; do not import the old number.
+- **Attention-variant study** — MQA (old 0.9800 / EPS 0.6055), LowRank (0.9625 / 0.5719),
+  Linear-Attn (0.6082 / 0.0333). Useful, but **demoted from headline**: the frontier now
+  makes the "good accuracy, destroyed explanation" point cleanly (naive-INT4: acc 0.974,
+  AUC 0.997, EPS 0.302), whereas the old Linear-Attn case is confounded by an *accuracy*
+  collapse. Keep as a secondary section only if re-run under the canonical protocol.
+- **KD ablations** (loss weights / temperature / depth, draft Table 3) — reviewers expect
+  these. They are distillation-phase *context*, not GAQ results. Keep, but re-run or label
+  explicitly as the distillation study; never place old-teacher accuracies beside the
+  canonical EPS as if from one run.
+- **Bootstrap 95% CIs** — pure rigor; keep the practice. Recompute on the canonical EPS;
+  you cannot paste old CIs onto new point estimates.
+
+*The new paper's rigor should come from GAQ-specific ablations (these now carry the weight):*
+per-submodule precision (which of softmax/LN/gate breaks first — justifies the hybrid
+policy), per-channel vs per-tensor weights, percentile vs min/max calibration, and PTQ vs
+QAT. These replace the old KD ablations as the paper's depth.
+
+**Not measured in the canonical generation (absent here by design, not oversight):**
 FP16 path, attention variants, KD ablations, bootstrap CIs, `insertion_auc`/`spearman_p10`
-for the frontier rows, and any ONNX-Runtime latency. If the paper needs one of these,
-**re-run it** under the GAQ protocol and add it here — do not borrow the old number.
+for the frontier rows, and ONNX-Runtime latency. If the paper needs one, **re-run it** under
+the GAQ protocol and add it here — do not borrow the old number.
 
 ---
 
