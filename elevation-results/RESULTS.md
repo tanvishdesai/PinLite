@@ -4,13 +4,32 @@
 numbers here are read from the run logs in this folder; the figure is `gaq_frontier.png`.
 Use this file when writing the draft.
 
-- **In-domain dataset:** LAV-DF (3400 train / 1550 test).
-- **Teacher:** PinPoint (ResNet-18 + CNN-GRU + 3× gated cross-attention), 15.0 M params.
-- **Student:** PinpointTransformerLite (MobileNetV3-Small + CNN-GRU + 2× gated cross-attention), 1.69 M params.
-- **Hardware (latency):** Kaggle CPU (Intel Xeon, fbgemm backend).
+> **HOW TO USE THIS FILE.** Every number you put in the paper must come from this file.
+> If a number you need is not here, it was **not measured in the canonical (GAQ) generation**
+> — do not pull it from the old draft, the old `comprehensive_benchmark_v3.csv`, or
+> `paper/pinlite_paper (4).pdf`. See the **"Deprecated — do NOT use"** ledger at the bottom
+> for the specific old numbers to avoid and what replaces them.
+
+- **In-domain dataset:** LAV-DF (3400 train / 1550 test; test = 405 real / 1145 fake).
+- **Cross-dataset:** FakeAVCeleb test (2120 samples), zero-shot.
+- **Teacher:** PinPoint (ResNet-18 + CNN-GRU + 3× gated cross-attention), 14.999 M params, 57.32 MB.
+- **Student:** PinpointTransformerLite (MobileNetV3-Small + CNN-GRU + 2× gated cross-attention), 1.695 M params, 6.62 MB FP32.
+- **Hardware (latency):** Kaggle CPU (Intel Xeon, fbgemm backend). Single-sample forward.
 - **The contribution:** GAQ keeps softmax / LayerNorm / the sigmoid gate in FP32 and
   quantizes only the Q/K/V/out/gate/FFN linears (per-channel, percentile-calibrated).
   The naive strawman additionally quantizes softmax/LN/sigmoid.
+
+### EPS definition used for ALL numbers in this file
+
+```
+EPS = w1 · Spearman(vec A_T, vec A_S) + (1 − w1) · TopK-IoU(top20% A_T, top20% A_S),   w1 = 0.5
+```
+
+**The canonical generation uses w1 = 0.5** (equal weight), averaged over 300 test samples.
+The old draft text uses **w = 0.7** — that is a different metric and a different number;
+do not carry the old EPS values or the w=0.7 weighting into the revised paper. (Sanity
+check: GAQ-INT8 EPS 0.5748 = 0.5·0.6551 + 0.5·0.4944.) Faithfulness = deletion/insertion
+AUC over 120 test samples; Faith-agree = Spearman of per-sample deletion scores vs teacher.
 
 ---
 
@@ -33,13 +52,13 @@ is model size / compression depth, not CPU latency.**
 Source: `gaq_results.csv`. Speedup is vs the FP32 **teacher** (latency 822.6 ms).
 Faith-agree = Spearman agreement of per-sample deletion scores vs the teacher.
 
-| Model | Size MB | Params M | Latency ms | Acc | AUC | EPS | Spearman | IoU | Del-AUC | Ins-AUC | Faith-agree | Speedup |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Teacher FP32 | 57.32 | 14.999 | 822.6 | 0.9806 | 0.9970 | 1.0000 | 1.0000 | 1.0000 | 0.7008 | 0.7007 | 1.0000 | 1.00 |
-| Distilled student (FP32) | 6.62 | 1.695 | 314.6 | 0.9865 | 0.9975 | 0.5719 | 0.6454 | 0.4983 | 0.6940 | 0.6988 | 0.7407 | 2.61 |
-| Naive INT8 attention (strawman) | 4.60 | 1.695 | 257.4 | 0.9865 | 0.9978 | 0.5634 | 0.6410 | 0.4858 | 0.7002 | 0.7016 | 0.6914 | 3.20 |
-| GAQ-INT8 (PTQ, ours) | 4.60 | 1.695 | 260.0 | 0.9871 | 0.9981 | 0.5748 | 0.6551 | 0.4944 | 0.6939 | 0.6987 | 0.7337 | 3.16 |
-| GAQ-QAT (ours) | 4.60 | 1.695 | 361.4 | 0.9858 | 0.9978 | 0.5896 | 0.6722 | 0.5070 | 0.6982 | 0.6950 | 0.7171 | 2.28 |
+| Model | Size MB | Params M | Latency ms | Acc | F1 | AUC | EPS | Spearman | IoU | Del-AUC | Ins-AUC | Faith-agree | Speedup |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Teacher FP32 | 57.32 | 14.999 | 822.6 | 0.9806 | 0.9869 | 0.9970 | 1.0000 | 1.0000 | 1.0000 | 0.7008 | 0.7007 | 1.0000 | 1.00 |
+| Distilled student (FP32) | 6.62 | 1.695 | 314.6 | 0.9865 | 0.9908 | 0.9975 | 0.5719 | 0.6454 | 0.4983 | 0.6940 | 0.6988 | 0.7407 | 2.61 |
+| Naive INT8 attention (strawman) | 4.60 | 1.695 | 257.4 | 0.9865 | 0.9908 | 0.9978 | 0.5634 | 0.6410 | 0.4858 | 0.7002 | 0.7016 | 0.6914 | 3.20 |
+| GAQ-INT8 (PTQ, ours) | 4.60 | 1.695 | 260.0 | 0.9871 | 0.9913 | 0.9981 | 0.5748 | 0.6551 | 0.4944 | 0.6939 | 0.6987 | 0.7337 | 3.16 |
+| GAQ-QAT (ours) | 4.60 | 1.695 | 361.4 | 0.9858 | 0.9904 | 0.9978 | 0.5896 | 0.6722 | 0.5070 | 0.6982 | 0.6950 | 0.7171 | 2.28 |
 
 **Read-out:** At INT8 every quantized variant matches the FP32 student on accuracy and EPS;
 the naive↔GAQ EPS gap is only +0.011. This table alone does **not** motivate GAQ — it
@@ -136,6 +155,49 @@ domain-shift weakness; do not over-claim. Consider this a limitation row, not a 
    pay for itself here. Keep as "recovers residual PTQ loss," not a headline.
 5. **AUC-vs-EPS divergence** (Table 2, INT4 naive) is a strong standalone sentence: a metric
    reviewers trust (AUC 0.997) is blind to a failure EPS catches.
+
+---
+
+## Deprecated — do NOT use (old-generation numbers that collide)
+
+These appear in `paper/PIN_Lite_NPL_Draft.md`, the old `comprehensive_benchmark_v3.csv`,
+and `paper/pinlite_paper (4).pdf`. They are from a **different teacher checkpoint / eval
+protocol / EPS weighting** and **must not** appear in the revised paper. Replace each with
+the canonical value above.
+
+| Quantity | Old value (DO NOT USE) | Canonical replacement (use this) |
+|---|---|---|
+| Teacher accuracy | 0.9737 | **0.9806** (Table 1) |
+| Teacher F1 / AUC | 0.9821 / 0.9683 | **0.9869 / 0.9970** |
+| Student accuracy | 0.9753 | **0.9865** |
+| Student AUC | 0.9584 | **0.9975** |
+| Student EPS | 0.6091 / 0.6076 (w=0.7) | **0.5719** (w=0.5) |
+| Teacher latency | 98.62 ms | **822.6 ms** (CPU, named HW) |
+| Student latency | 45.93 ms | **314.6 ms** (CPU) / 311.1 ms standalone |
+| EPS weighting | w = 0.7 | **w1 = 0.5** |
+| Bootstrap 95% CIs (draft Table 2) | — | **not computed** in canonical gen; omit or re-run |
+
+**Whole rows / studies to DROP (not in the canonical generation):**
+
+- **Pruned** row (6.62 MB, identical to Distilled) — broken unstructured pruning; produced
+  no size/param change. Cut entirely (one-line limitation at most).
+- **FP16** row (3.31 MB) — not re-measured in the GAQ generation. Drop, or re-run if a
+  GPU/FP16 deployment row is wanted; do not import the old number.
+- **Combined (PIN-Lite)** row (5.29 MB, 171.29 ms, acc 0.9822) — the misleading INT8-CPU
+  latency claim. Drop. The honest latency story is Table 3 (~1.0×).
+- **Attention-variant rows** — MQA (0.9800 / EPS 0.6055), LowRank (0.9625 / 0.5719),
+  Linear-Attn (0.6082 / 0.0333). Old generation, orthogonal to GAQ, and the Linear-Attn
+  "EPS collapse" is confounded by an accuracy collapse. If you keep an attention-variant
+  study at all, it must be **re-run** under the canonical protocol; otherwise drop it.
+- **Ablation tables** (loss weights / temperature / depth, draft Table 3) — old-generation
+  KD ablations. They are *context*, not GAQ results. Either re-run, or keep **only** if you
+  state explicitly they are from the distillation study and carry no EPS/GAQ numbers. Never
+  place them beside the canonical EPS numbers as if from one run.
+
+**Not measured in the canonical generation (so absent here by design, not by oversight):**
+FP16 path, attention variants, KD ablations, bootstrap CIs, `insertion_auc`/`spearman_p10`
+for the frontier rows, and any ONNX-Runtime latency. If the paper needs one of these,
+**re-run it** under the GAQ protocol and add it here — do not borrow the old number.
 
 ---
 
