@@ -1,0 +1,3 @@
+model,favc_acc,favc_f1,favc_auc
+FP32 student,0.4953,0.1098,0.614
+GAQ-INT8 (ours),0.4792,0.0754,0.5679

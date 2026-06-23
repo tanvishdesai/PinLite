@@ -68,13 +68,22 @@ Optionally tune `EPS_SAMPLES`, `FAITHFULNESS_SAMPLES`, `CALIBRATION_SAMPLES`, et
 | 3 | `python gaq_p1_parity.py` | CPU/GPU | parity gate (must pass) |
 | 4 | `python gaq_ptq.py` | GPU + CPU | rows: Naive INT8 strawman, GAQ-INT8 (PTQ); `gaq_int8_ptq.pth` |
 | 5 | `python gaq_qat.py` | GPU (P100) | row: GAQ-QAT; `gaq_int8_qat.pth` |
-| 6 | `python gaq_onnx_latency.py` | CPU | `gaq_latency.csv` (named-hardware latency) |
-| 7 | `python gaq_crossdataset.py` | GPU | `gaq_crossdataset.csv` (needs FAVC paths) |
-| 8 | `python gaq_build_table.py` | CPU | `gaq_table1.md` (final table + success bar) |
+| 6 | `python gaq_p5_frontier.py` | GPU | `gaq_frontier.csv`, `gaq_frontier_eps.csv` (**the contrast experiment**) |
+| 7 | `python gaq_plot_frontier.py` | CPU | `gaq_frontier.png` (the paper figure) |
+| 8 | `pip install onnx onnxruntime; python gaq_onnx_latency.py` | CPU | `gaq_latency.csv` (named-hardware latency) |
+| 9 | `python gaq_crossdataset.py` | GPU | `gaq_crossdataset.csv` (needs FAVC paths) |
+| 10 | `python gaq_build_table.py` | CPU | `gaq_table1.md` (final table + success bar) |
 
 Steps 2 → 5 must run in order (each appends to `gaq_results.csv` and step 2 writes
-the teacher-latency reference used for speedup). Steps 6–7 are independent. Step 8
-reads whatever CSVs exist.
+the teacher-latency reference used for speedup). **Step 6 (`gaq_p5_frontier.py`) is
+the most important new experiment** — it sweeps bits 8→6→4→3 for naive vs GAQ and is
+where the two EPS curves are expected to fan apart (INT8 alone does not separate
+them). Steps 7–9 are independent. Step 10 reads whatever CSVs exist.
+
+> Frontier cost: it evaluates 8 models (4 bit-widths × 2 policies) over
+> `EPS_SAMPLES`/`FAITHFULNESS_SAMPLES`. If it is too slow on your GPU, drop
+> `FAITHFULNESS_SAMPLES` to ~60 in `gaq_config.py` or trim `FRONTIER_BITS` to
+> `[8, 4, 3]` in `gaq_p5_frontier.py`.
 
 The story Table 1 tells: **naive INT8 destroys the attention map (EPS + faithfulness
 collapse); GAQ-INT8 keeps both; GAQ-QAT recovers any residual loss** — all while

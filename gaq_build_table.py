@@ -111,6 +111,28 @@ def main():
         for r in cross:
             extra_md.append(f"| {r['model']} | {r['favc_acc']} | {r['favc_f1']} | {r['favc_auc']} |")
 
+    # ---- Precision frontier (the headline contrast) --------------------------
+    front = _read_rows(C.out("gaq_frontier.csv"))
+    if front:
+        extra_md += ["", "## Precision frontier — naive vs GAQ as bits drop", "",
+                     "| Bits | Policy | Acc | AUC | EPS | EPS p10 | Faith-agree |",
+                     "|---|---|---|---|---|---|---|"]
+        # sort by bits desc, naive before gaq for readability
+        front_sorted = sorted(front, key=lambda r: (-int(r["bits"]), r["policy"]))
+        for r in front_sorted:
+            extra_md.append(
+                f"| INT{r['bits']} | {r['policy']} | {_fmt(r.get('acc'))} | "
+                f"{_fmt(r.get('auc'))} | {_fmt(r.get('eps'))} | "
+                f"{_fmt(r.get('eps_p10'))} | {_fmt(r.get('faith_agreement'))} |")
+        # EPS gap verdict (GAQ - naive) per bit-width
+        by_bp = {(r["bits"], r["policy"]): r for r in front}
+        extra_md += ["", "**EPS gap (GAQ − naive) — widening gap = GAQ contribution:**", ""]
+        for bits in sorted({r["bits"] for r in front}, key=lambda b: -int(b)):
+            g, n = by_bp.get((bits, "gaq")), by_bp.get((bits, "naive"))
+            ge, ne = _f(g.get("eps")) if g else None, _f(n.get("eps")) if n else None
+            if ge is not None and ne is not None:
+                extra_md.append(f"- INT{bits}: GAQ {ge:.4f} − naive {ne:.4f} = **{ge - ne:+.4f}**")
+
     out_md = "# PIN-Lite v2 — GAQ Table 1\n\n" + table_md + "\n" + \
              "\n".join(bar_md) + "\n" + "\n".join(extra_md) + "\n"
     with open(C.out("gaq_table1.md"), "w", encoding="utf-8") as f:

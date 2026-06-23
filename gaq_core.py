@@ -41,6 +41,7 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+_trapz = getattr(np, "trapezoid", None) or getattr(np, "trapz", None)  # np.trapz removed in NumPy 2.0
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -643,11 +644,21 @@ def compute_eps(teacher: nn.Module, student: nn.Module, dataloader, device: str,
         return {}
     sp = float(np.mean(spears))
     iou = float(np.mean(ious))
+    per_sample_eps = [w1 * s + (1 - w1) * j for s, j in zip(spears, ious)]
     return {
         "eps": w1 * sp + (1 - w1) * iou,
         "spearman": sp,
         "iou": iou,
         "eps_samples": count,
+        # Per-sample arrays so callers can inspect the DISTRIBUTION (the mean can
+        # wash out a tail divergence between naive and GAQ even when it is real).
+        "per_sample_eps": per_sample_eps,
+        "per_sample_spearman": spears,
+        "per_sample_iou": ious,
+        # Tail summary: the worst 10% of samples is where naive quant first shows.
+        "eps_p10": float(np.percentile(per_sample_eps, 10)),
+        "eps_p50": float(np.percentile(per_sample_eps, 50)),
+        "spearman_p10": float(np.percentile(spears, 10)),
     }
 
 
@@ -716,8 +727,8 @@ def deletion_insertion_scores(model: nn.Module, dataloader, device: str,
                     vi[:, ranked[:k], :, :, :] = v[:, ranked[:k], :, :, :]
                 pi = torch.sigmoid(model(vi, a)[0].float()).item()
                 ins_curve.append(pi)
-            del_auc = float(np.trapz(del_curve, fractions))
-            ins_auc = float(np.trapz(ins_curve, fractions))
+            del_auc = float(_trapz(del_curve, fractions))
+            ins_auc = float(_trapz(ins_curve, fractions))
             del_aucs.append(del_auc)
             ins_aucs.append(ins_auc)
             per_sample_del.append(del_auc)

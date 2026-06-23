@@ -87,35 +87,47 @@ def main():
     print(f"  {int8_lat:.1f} ms  (speedup vs FP32 = {fp32_lat / max(int8_lat,1e-6):.2f}x)")
 
     # --- ONNX paths -----------------------------------------------------------
+    # Separate the two failure modes: (a) packages missing -> tell the user to pip
+    # install; (b) export/quantize blows up (GRU/5D-video/attention can be finicky
+    # for the ONNX exporter) -> report the REAL error so it can be fixed, and still
+    # keep the PyTorch rows we already measured instead of losing the whole run.
     try:
         import onnx  # noqa: F401
         import onnxruntime  # noqa: F401
         from onnxruntime.quantization import quantize_dynamic, QuantType
-
-        print("\n[4/5] Export + ONNX Runtime FP32 ...")
-        wrapper = OnnxWrapper(student).eval()
-        onnx_fp32 = C.out("gaq_student_fp32.onnx")
-        torch.onnx.export(
-            wrapper, (v[:1], a[:1]), onnx_fp32,
-            input_names=["video", "audio"], output_names=["logits"],
-            dynamic_axes={"video": {0: "b"}, "audio": {0: "b", 1: "t"}, "logits": {0: "b"}},
-            opset_version=17, do_constant_folding=True)
-        onnx_fp32_lat = _onnx_latency(onnx_fp32, v, a, C.LATENCY_REPEATS, C.LATENCY_WARMUP)
-        rows.append(("ONNX Runtime FP32", onnx_fp32_lat))
-        print(f"  {onnx_fp32_lat:.1f} ms")
-
-        print("\n[5/5] ONNX Runtime INT8 (dynamic) ...")
-        onnx_int8 = C.out("gaq_student_int8.onnx")
-        quantize_dynamic(onnx_fp32, onnx_int8, weight_type=QuantType.QInt8)
-        onnx_int8_lat = _onnx_latency(onnx_int8, v, a, C.LATENCY_REPEATS, C.LATENCY_WARMUP)
-        rows.append(("ONNX Runtime INT8 (GAQ)", onnx_int8_lat))
-        print(f"  {onnx_int8_lat:.1f} ms  (speedup vs FP32 = "
-              f"{fp32_lat / max(onnx_int8_lat,1e-6):.2f}x)")
-        fp32_size = os.path.getsize(onnx_fp32) / 1e6
-        int8_size = os.path.getsize(onnx_int8) / 1e6
-        print(f"  ONNX size: FP32={fp32_size:.2f}MB -> INT8={int8_size:.2f}MB")
+        have_onnx = True
     except ImportError:
+        have_onnx = False
         print("\n[ONNX skipped] install: pip install onnx onnxruntime")
+
+    if have_onnx:
+        try:
+            print("\n[4/5] Export + ONNX Runtime FP32 ...")
+            wrapper = OnnxWrapper(student).eval()
+            onnx_fp32 = C.out("gaq_student_fp32.onnx")
+            torch.onnx.export(
+                wrapper, (v[:1], a[:1]), onnx_fp32,
+                input_names=["video", "audio"], output_names=["logits"],
+                dynamic_axes={"video": {0: "b"}, "audio": {0: "b", 1: "t"}, "logits": {0: "b"}},
+                opset_version=17, do_constant_folding=True)
+            onnx_fp32_lat = _onnx_latency(onnx_fp32, v, a, C.LATENCY_REPEATS, C.LATENCY_WARMUP)
+            rows.append(("ONNX Runtime FP32", onnx_fp32_lat))
+            print(f"  {onnx_fp32_lat:.1f} ms")
+
+            print("\n[5/5] ONNX Runtime INT8 (dynamic) ...")
+            onnx_int8 = C.out("gaq_student_int8.onnx")
+            quantize_dynamic(onnx_fp32, onnx_int8, weight_type=QuantType.QInt8)
+            onnx_int8_lat = _onnx_latency(onnx_int8, v, a, C.LATENCY_REPEATS, C.LATENCY_WARMUP)
+            rows.append(("ONNX Runtime INT8 (GAQ)", onnx_int8_lat))
+            print(f"  {onnx_int8_lat:.1f} ms  (speedup vs FP32 student = "
+                  f"{fp32_lat / max(onnx_int8_lat,1e-6):.2f}x)")
+            fp32_size = os.path.getsize(onnx_fp32) / 1e6
+            int8_size = os.path.getsize(onnx_int8) / 1e6
+            print(f"  ONNX size: FP32={fp32_size:.2f}MB -> INT8={int8_size:.2f}MB")
+        except Exception as e:  # export/quantize/runtime failure, NOT a missing package
+            print(f"\n[ONNX export FAILED] {type(e).__name__}: {e}")
+            print("  Keeping the PyTorch latency rows above. Common fixes: bump")
+            print("  opset_version, or set dynamo=False / try torch.onnx.dynamo_export.")
 
     import csv
     with open(C.out("gaq_latency.csv"), "w", newline="") as f:

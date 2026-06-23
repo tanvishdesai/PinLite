@@ -1,0 +1,5 @@
+backend,latency_ms,hardware,note
+PyTorch FP32 student,311.1,"Kaggle CPU (Intel Xeon, fbgemm)",reference
+PyTorch dynamic-INT8 GAQ,308.9,"Kaggle CPU (Intel Xeon, fbgemm)",speedup_vs_fp32_student=1.01x
+ONNX Runtime FP32,,"Kaggle CPU (Intel Xeon, fbgemm)",export_failed_onnxscript_missing
+ONNX Runtime INT8 (GAQ),,"Kaggle CPU (Intel Xeon, fbgemm)",export_failed_onnxscript_missing
